@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>주식 진입 신호 - TradingView 스타일</title>
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0a0e27;
+            color: #d1d4dc;
+            padding: 20px;
+        }
+        .container { max-width: 1800px; margin: 0 auto; }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px;
+            border-radius: 20px;
+            margin-bottom: 30px;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);
+        }
+        .header h1 { font-size: 2.5em; margin-bottom: 10px; color: white; }
+        .stock-card {
+            background: #131722;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        .stock-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #2a2e39;
+        }
+        .stock-name { font-size: 2em; font-weight: bold; color: #fff; }
+        .stock-code { color: #787b86; font-size: 1.1em; margin-top: 5px; }
+        .rs-badge {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            padding: 15px 30px;
+            border-radius: 30px;
+            font-size: 1.5em;
+            font-weight: bold;
+            color: white;
+        }
+        .chart-wrapper {
+            background: #1e222d;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+        }
+        .chart-title {
+            font-size: 1.3em;
+            margin-bottom: 15px;
+            color: #2962ff;
+            font-weight: 600;
+        }
+        .chart-container { height: 500px; margin-bottom: 10px; }
+        .volume-container { height: 150px; }
+        .price-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .price-item {
+            background: #1e222d;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            border: 2px solid #2a2e39;
+        }
+        .price-label { color: #787b86; font-size: 0.9em; margin-bottom: 10px; }
+        .price-value { font-size: 1.6em; font-weight: bold; color: #fff; }
+        .price-value.entry { color: #26a69a; }
+        .price-value.stop { color: #ef5350; }
+        .analysis-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+        .analysis-box {
+            background: #1e222d;
+            padding: 25px;
+            border-radius: 12px;
+            border: 1px solid #2a2e39;
+        }
+        .analysis-title {
+            font-size: 1.4em;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: #2962ff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .score-badge {
+            background: #2a2e39;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.7em;
+            margin-left: auto;
+        }
+        .score-badge.excellent { background: #26a69a; }
+        .score-badge.good { background: #2962ff; }
+        .score-badge.warning { background: #ff9800; }
+        .check-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            margin-bottom: 10px;
+            background: #131722;
+            border-radius: 10px;
+            border-left: 4px solid #2a2e39;
+        }
+        .check-item.passed { border-left-color: #26a69a; }
+        .check-item.failed { border-left-color: #ef5350; }
+        .check-item.excellent { border-left-color: #ffd700; background: rgba(255, 215, 0, 0.05); }
+        .check-icon { font-size: 1.3em; margin-right: 15px; min-width: 30px; }
+        .check-label { flex: 1; color: #d1d4dc; }
+        .btn-group { display: flex; gap: 15px; margin-top: 20px; }
+        .btn {
+            flex: 1;
+            padding: 15px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: bold;
+            text-align: center;
+            transition: all 0.3s;
+        }
+        .btn-tradingview { background: #2962ff; color: white; }
+        .btn-tradingview:hover { background: #1e53e5; transform: translateY(-2px); }
+        .btn-naver { background: #03c75a; color: white; }
+        .btn-naver:hover { background: #02b350; transform: translateY(-2px); }
+        @media (max-width: 1200px) { .analysis-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 주식 진입 신호 분석</h1>
+            <div style="font-size: 1.1em; margin-top: 10px;">David Ryan & Mark Minervini 전략</div>
+            <div style="font-size: 0.9em; opacity: 0.8; margin-top: 10px;">2026년 01월 01일 02:31:14</div>
+        </div>
+
+        <div class="stock-card">
+            <div class="stock-header">
+                <div>
+                    <div class="stock-name">큐리옥스바이오시스템즈</div>
+                    <div class="stock-code">445680</div>
+                </div>
+                <div class="rs-badge">RS 96</div>
+            </div>
+
+            <div class="chart-wrapper">
+                <div class="chart-title">📊 캔들스틱 차트</div>
+                <div id="chart-445680" class="chart-container"></div>
+                <div id="volume-445680" class="volume-container"></div>
+            </div>
+
+            <div class="price-info">
+                <div class="price-item">
+                    <div class="price-label">현재가</div>
+                    <div class="price-value">117,000원</div>
+                </div>
+
+                <div class="price-item">
+                    <div class="price-label">🎯 Ryan 진입가</div>
+                    <div class="price-value entry">117,718원</div>
+                </div>
+                <div class="price-item">
+                    <div class="price-label">🛑 Ryan 손절가</div>
+                    <div class="price-value stop">108,780원</div>
+                </div>
+
+                <div class="price-item">
+                    <div class="price-label">🎯 Minervini 진입가</div>
+                    <div class="price-value entry">117,718원</div>
+                </div>
+                <div class="price-item">
+                    <div class="price-label">🛑 Minervini 손절가</div>
+                    <div class="price-value stop">108,192원</div>
+                </div>
+
+            </div>
+            <div class="analysis-grid">
+
+                <div class="analysis-box">
+                    <div class="analysis-title">
+                        🎯 David Ryan 전략
+                        <span class="score-badge good">4/7</span>
+                    </div>
+
+                    <div class="check-item excellent">
+                        <div class="check-icon">🌟</div>
+                        <div class="check-label">RS Rating 96 (90+ 필요)</div>
+                    </div>
+
+                    <div class="check-item failed">
+                        <div class="check-icon">✗</div>
+                        <div class="check-label">High Tight Flag 패턴 미형성</div>
+                    </div>
+
+                    <div class="check-item passed">
+                        <div class="check-icon">✓</div>
+                        <div class="check-label">베이스 품질 Good (깊이 31.4%, 타이트 27.7%)</div>
+                    </div>
+
+                    <div class="check-item failed">
+                        <div class="check-icon">✗</div>
+                        <div class="check-label">거래량 건조 미확인</div>
+                    </div>
+
+                    <div class="check-item passed">
+                        <div class="check-icon">✓</div>
+                        <div class="check-label">피봇 포인트 0.5% 거리</div>
+                    </div>
+
+                    <div class="check-item failed">
+                        <div class="check-icon">✗</div>
+                        <div class="check-label">거래량 돌파 대기</div>
+                    </div>
+
+                    <div class="check-item passed">
+                        <div class="check-icon">✓</div>
+                        <div class="check-label">52주 최고가 0.5% 이내</div>
+                    </div>
+
+                </div>
+
+                <div class="analysis-box">
+                    <div class="analysis-title">
+                        📈 Mark Minervini 전략
+                        <span class="score-badge excellent">9/10</span>
+                    </div>
+
+                    <div class="check-item passed">
+                        <div class="check-icon">✓</div>
+                        <div class="check-label">현재가(117,000) > 150일 이평(58,222)</div>
+                    </div>
+
+                    <div class="check-item passed">
+                        <div class="check-icon">✓</div>
+                        <div class="check-label">현재가 > 200일 이평(48,897)</div>
+                    </div>
+
+                    <div class="check-item passed">
+                        <div class="check-icon">✓</div>
+                        <div class="check-label">150일(58,222) > 200일(48,897)</div>
+                    </div>
+
+                    <div class="check-item passed">
+                        <div class="check-icon">✓</div>
+                        <div class="check-label">200일 이평선 상승 추세</div>
+                    </div>
+
+                    <div class="check-item passed">
+                        <div class="check-icon">✓</div>
+                        <div class="check-label">50일(84,784) > 150일</div>
+                    </div>
+
+                    <div class="check-item passed">
+                        <div class="check-icon">✓</div>
+                        <div class="check-label">현재가 > 50일 이평(84,784)</div>
+                    </div>
+
+                    <div class="check-item passed">
+                        <div class="check-icon">✓</div>
+                        <div class="check-label">52주 최저 대비 30% 이상</div>
+                    </div>
+
+                    <div class="check-item passed">
+                        <div class="check-icon">✓</div>
+                        <div class="check-label">52주 최고가 25% 이내(0.5%)</div>
+                    </div>
+
+                    <div class="check-item failed">
+                        <div class="check-icon">✗</div>
+                        <div class="check-label">VCP 미형성</div>
+                    </div>
+
+                    <div class="check-item excellent">
+                        <div class="check-icon">🌟</div>
+                        <div class="check-label">RS 96</div>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="btn-group">
+                <a href="https://www.tradingview.com/chart/?symbol=KRX%3A445680" target="_blank" class="btn btn-tradingview">
+                    TradingView 차트 분석 →
+                </a>
+                <a href="https://finance.naver.com/item/main.nhn?code=445680" target="_blank" class="btn btn-naver">
+                    네이버 금융 정보 →
+                </a>
+            </div>
+        </div>
+
+        <div class="stock-card">
+            <div class="stock-header">
+                <div>
+                    <div class="stock-name">SK스퀘어</div>
+                    <div class="stock-code">402340</div>
+                </div>
+                <div class="rs-badge">RS 95</div>
+            </div>
+
+            <div class="chart-wrapper">
+                <div class="chart-title">📊 캔들스틱 차트</div>
+                <div id="chart-402340" class="chart-container"></div>
+                <div id="volume-402340" class="volume-container"></div>
+            </div>
+
+            <div class="price-info">
+                <div class="price-item">
+                    <div class="price-label">현재가</div>
+                    <div class="price-value">368,000원</div>
+                </div>
+
+                <div class="price-item">
+                    <div class="price-label">🎯 Ryan 진입가</div>
+                    <div class="price-value entry">370,370원</div>
+                </div>
+                <div class="price-item">
+                    <div class="price-label">🛑 Ryan 손절가</div>
+                    <div class="price-value stop">342,250원</div>
+                </div>
+
+                <div class="price-item">
+                    <div class="price-label">🎯 Minervini 진입가</div>
+                    <div class="price-value entry">370,370원</div>
+                </div>
+                <div class="price-item">
+                    <div class="price-label">🛑 Minervini 손절가</div>
+                    <div class="price-value stop">340,400원</div>
+                </div>
+
+            </div>
+            <div class="analysis-grid">
+
+                <div class="analysis-box">
+                    <div class="analysis-title">
+                        🎯 David Ryan 전략
+                        <span class="score-badge good">4/7</span>
+                    </div>
+
+                    <div class="check-item excellent">
+                        <div class="check-icon">🌟</div>
+                        <div class="check-label">RS Rating 95 (90+ 필요)</div>
+                    </div>
+
+                    <div class="check-item failed">
+                        <div class="check-icon">✗</div>
+                        <div class="check-label">High Tight Flag 패턴 미형성</div>
+                    </div>
+
+                    <div class="check-item passed">
+                        <div class="check-icon">✓</div>
+                        <div class="check-label">베이스 품질 Good (깊이 26.1%, 타이트 35.3%)</div>
+                    </div>
+
+                    <div class="check-item failed">
+                        <div class="check-icon">✗</div>
+                        <div class="check-label">거래량 건조 미확인</div>
+                    </div>
+
+                    <div class="check-item passed">
+                        <div class="check-icon">✓</div>
+                        <div class="check-label">피봇 포인트 0.5% 거리</div>
+                    </div>
+
+                    <div class="check-item failed">
+                        <div class="check-icon">✗</div>
+                        <div class="check-label">거래량 돌파 대기</div>
+                    </div>
+
+                    <div class="check-item passed">
+                        <div class="check-icon">✓</div>
+                        <div class="check-label">52주 최고가 0.5% 이내</div>
+                    </div>
+
+                </div>
+
+                <div class="analysis-box">
+                    <div class="analysis-title">
+                        📈 Mark Minervini 전략
+                        <span class="score-badge excellent">9/10</span>
+                    </div>
+
+                    <div class="check-item passed">
+                        <div class="check-icon">✓</div>
+                        <div class="check-label">현재가(368,000) > 150일 이평(208,583)</div>
+                    </div>
+
+                    <div class="check-item passed">
+                        <div class="check-icon">✓</div>
+                        <div class="check-label">현재가 > 200일 이평(179,264)</div>
+                    </div>
+
+                    <div class="check-item passed">
+                        <div class="check-icon">✓</div>
+                        <div class="check-label">150일(208,583) > 200일(179,264)</div>
+                    </div>
+
+                    <div class="check-item passed">
+                        <div class="check-icon">✓</div>
+                        <div class="check-label">200일 이평선 상승 추세</div>
+                    </div>
+
+                    <div class="check-item passed">
+                        <div class="check-icon">✓</div>
+                        <div class="check-label">50일(295,320) > 150일</div>
+                    </div>
+
+                    <div class="check-item passed">
+                        <div class="check-icon">✓</div>
+                        <div class="check-label">현재가 > 50일 이평(295,320)</div>
+                    </div>
+
+                    <div class="check-item passed">
+                        <div class="check-icon">✓</div>
+                        <div class="check-label">52주 최저 대비 30% 이상</div>
+                    </div>
+
+                    <div class="check-item passed">
+                        <div class="check-icon">✓</div>
+                        <div class="check-label">52주 최고가 25% 이내(0.5%)</div>
+                    </div>
+
+                    <div class="check-item failed">
+                        <div class="check-icon">✗</div>
+                        <div class="check-label">VCP 미형성</div>
+                    </div>
+
+                    <div class="check-item excellent">
+                        <div class="check-icon">🌟</div>
+                        <div class="check-label">RS 95</div>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="btn-group">
+                <a href="https://www.tradingview.com/chart/?symbol=KRX%3A402340" target="_blank" class="btn btn-tradingview">
+                    TradingView 차트 분석 →
+                </a>
+                <a href="https://finance.naver.com/item/main.nhn?code=402340" target="_blank" class="btn btn-naver">
+                    네이버 금융 정보 →
+                </a>
+            </div>
+        </div>
+
+    </div>
+    <script>
+        const chartData = {"445680": {"candles": [{"time": 1751846400, "open": 39700.0, "high": 42500.0, "low": 39600.0, "close": 41750.0}, {"time": 1751932800, "open": 41300.0, "high": 43600.0, "low": 41300.0, "close": 41600.0}, {"time": 1752019200, "open": 42050.0, "high": 44400.0, "low": 41650.0, "close": 44200.0}, {"time": 1752105600, "open": 44000.0, "high": 44250.0, "low": 43150.0, "close": 43600.0}, {"time": 1752192000, "open": 44200.0, "high": 44750.0, "low": 43200.0, "close": 43650.0}, {"time": 1752451200, "open": 43900.0, "high": 44200.0, "low": 38150.0, "close": 38750.0}, {"time": 1752537600, "open": 38750.0, "high": 39700.0, "low": 37950.0, "close": 39150.0}, {"time": 1752624000, "open": 39100.0, "high": 39950.0, "low": 37750.0, "close": 39150.0}, {"time": 1752710400, "open": 40150.0, "high": 43700.0, "low": 39000.0, "close": 42000.0}, {"time": 1752796800, "open": 41900.0, "high": 43350.0, "low": 41200.0, "close": 42850.0}, {"time": 1753056000, "open": 42650.0, "high": 43000.0, "low": 40700.0, "close": 41900.0}, {"time": 1753142400, "open": 41450.0, "high": 41900.0, "low": 40150.0, "close": 40350.0}, {"time": 1753228800, "open": 39000.0, "high": 40150.0, "low": 37800.0, "close": 39100.0}, {"time": 1753315200, "open": 40000.0, "high": 41300.0, "low": 38500.0, "close": 39100.0}, {"time": 1753401600, "open": 39150.0, "high": 39600.0, "low": 38550.0, "close": 38900.0}, {"time": 1753660800, "open": 38900.0, "high": 39900.0, "low": 38350.0, "close": 39000.0}, {"time": 1753747200, "open": 37850.0, "high": 38250.0, "low": 35350.0, "close": 36300.0}, {"time": 1753833600, "open": 37050.0, "high": 37700.0, "low": 36500.0, "close": 36850.0}, {"time": 1753920000, "open": 37450.0, "high": 39900.0, "low": 37400.0, "close": 38500.0}, {"time": 1754006400, "open": 37850.0, "high": 38050.0, "low": 36600.0, "close": 37650.0}, {"time": 1754265600, "open": 38000.0, "high": 42200.0, "low": 38000.0, "close": 41500.0}, {"time": 1754352000, "open": 41000.0, "high": 42000.0, "low": 40800.0, "close": 41300.0}, {"time": 1754438400, "open": 41850.0, "high": 42500.0, "low": 40600.0, "close": 41000.0}, {"time": 1754524800, "open": 40950.0, "high": 41100.0, "low": 40100.0, "close": 40150.0}, {"time": 1754611200, "open": 41700.0, "high": 51200.0, "low": 41700.0, "close": 50200.0}, {"time": 1754870400, "open": 49250.0, "high": 51000.0, "low": 48650.0, "close": 50000.0}, {"time": 1754956800, "open": 51600.0, "high": 53800.0, "low": 49950.0, "close": 50900.0}, {"time": 1755043200, "open": 51500.0, "high": 52100.0, "low": 50000.0, "close": 51400.0}, {"time": 1755129600, "open": 51000.0, "high": 56300.0, "low": 49350.0, "close": 54300.0}, {"time": 1755475200, "open": 43400.0, "high": 44450.0, "low": 40000.0, "close": 41200.0}, {"time": 1755561600, "open": 39700.0, "high": 40750.0, "low": 39050.0, "close": 39100.0}, {"time": 1755648000, "open": 37300.0, "high": 39100.0, "low": 36750.0, "close": 37000.0}, {"time": 1755734400, "open": 38950.0, "high": 40100.0, "low": 38150.0, "close": 38550.0}, {"time": 1755820800, "open": 39450.0, "high": 41600.0, "low": 39400.0, "close": 40000.0}, {"time": 1756080000, "open": 41800.0, "high": 41800.0, "low": 40100.0, "close": 40600.0}, {"time": 1756166400, "open": 39850.0, "high": 43750.0, "low": 39450.0, "close": 43550.0}, {"time": 1756252800, "open": 43650.0, "high": 44000.0, "low": 42250.0, "close": 42800.0}, {"time": 1756339200, "open": 42000.0, "high": 42750.0, "low": 40800.0, "close": 41500.0}, {"time": 1756425600, "open": 42400.0, "high": 42650.0, "low": 41350.0, "close": 42300.0}, {"time": 1756684800, "open": 41800.0, "high": 42700.0, "low": 40650.0, "close": 41000.0}, {"time": 1756771200, "open": 40900.0, "high": 42950.0, "low": 40550.0, "close": 42100.0}, {"time": 1756857600, "open": 42350.0, "high": 44750.0, "low": 41700.0, "close": 44100.0}, {"time": 1756944000, "open": 44450.0, "high": 44600.0, "low": 42550.0, "close": 43600.0}, {"time": 1757030400, "open": 43600.0, "high": 47900.0, "low": 42950.0, "close": 46500.0}, {"time": 1757289600, "open": 47250.0, "high": 47400.0, "low": 44850.0, "close": 45500.0}, {"time": 1757376000, "open": 45650.0, "high": 46600.0, "low": 45200.0, "close": 45450.0}, {"time": 1757462400, "open": 45250.0, "high": 45350.0, "low": 43750.0, "close": 44550.0}, {"time": 1757548800, "open": 53000.0, "high": 54800.0, "low": 47950.0, "close": 48250.0}, {"time": 1757635200, "open": 49150.0, "high": 51800.0, "low": 48550.0, "close": 50900.0}, {"time": 1757894400, "open": 52000.0, "high": 55200.0, "low": 51200.0, "close": 53200.0}, {"time": 1757980800, "open": 54300.0, "high": 54600.0, "low": 51300.0, "close": 51600.0}, {"time": 1758067200, "open": 51600.0, "high": 53000.0, "low": 50400.0, "close": 51200.0}, {"time": 1758153600, "open": 54000.0, "high": 59300.0, "low": 53300.0, "close": 56900.0}, {"time": 1758240000, "open": 56600.0, "high": 58000.0, "low": 55900.0, "close": 57000.0}, {"time": 1758499200, "open": 57500.0, "high": 59500.0, "low": 54100.0, "close": 57100.0}, {"time": 1758585600, "open": 57100.0, "high": 65000.0, "low": 56200.0, "close": 62600.0}, {"time": 1758672000, "open": 61900.0, "high": 63000.0, "low": 59600.0, "close": 60400.0}, {"time": 1758758400, "open": 61100.0, "high": 71500.0, "low": 61100.0, "close": 66700.0}, {"time": 1758844800, "open": 64300.0, "high": 65500.0, "low": 61800.0, "close": 62900.0}, {"time": 1759104000, "open": 63400.0, "high": 66000.0, "low": 61700.0, "close": 65000.0}, {"time": 1759190400, "open": 65000.0, "high": 68100.0, "low": 64200.0, "close": 67400.0}, {"time": 1759276800, "open": 67400.0, "high": 73600.0, "low": 66400.0, "close": 71700.0}, {"time": 1759363200, "open": 71000.0, "high": 74000.0, "low": 70700.0, "close": 71100.0}, {"time": 1760054400, "open": 72200.0, "high": 84100.0, "low": 71600.0, "close": 83300.0}, {"time": 1760313600, "open": 80100.0, "high": 82100.0, "low": 79000.0, "close": 80400.0}, {"time": 1760400000, "open": 81000.0, "high": 81500.0, "low": 69400.0, "close": 70200.0}, {"time": 1760486400, "open": 70200.0, "high": 72000.0, "low": 65600.0, "close": 68700.0}, {"time": 1760572800, "open": 69400.0, "high": 71400.0, "low": 66800.0, "close": 69000.0}, {"time": 1760659200, "open": 69000.0, "high": 71300.0, "low": 66600.0, "close": 67300.0}, {"time": 1760918400, "open": 68500.0, "high": 75100.0, "low": 68400.0, "close": 70300.0}, {"time": 1761004800, "open": 70500.0, "high": 72100.0, "low": 68800.0, "close": 70000.0}, {"time": 1761091200, "open": 70500.0, "high": 71900.0, "low": 69150.0, "close": 71000.0}, {"time": 1761177600, "open": 71600.0, "high": 75000.0, "low": 70400.0, "close": 72100.0}, {"time": 1761264000, "open": 72300.0, "high": 73800.0, "low": 67100.0, "close": 68000.0}, {"time": 1761523200, "open": 68100.0, "high": 71000.0, "low": 66500.0, "close": 69600.0}, {"time": 1761609600, "open": 69900.0, "high": 71000.0, "low": 64800.0, "close": 67400.0}, {"time": 1761696000, "open": 66700.0, "high": 73900.0, "low": 65800.0, "close": 73700.0}, {"time": 1761782400, "open": 73000.0, "high": 73500.0, "low": 68300.0, "close": 69500.0}, {"time": 1761868800, "open": 70200.0, "high": 77700.0, "low": 68700.0, "close": 75700.0}, {"time": 1762128000, "open": 76100.0, "high": 76600.0, "low": 73100.0, "close": 75400.0}, {"time": 1762214400, "open": 75000.0, "high": 81700.0, "low": 73500.0, "close": 79800.0}, {"time": 1762300800, "open": 80200.0, "high": 82000.0, "low": 74200.0, "close": 77200.0}, {"time": 1762387200, "open": 78000.0, "high": 80200.0, "low": 74500.0, "close": 74700.0}, {"time": 1762473600, "open": 72000.0, "high": 77100.0, "low": 71500.0, "close": 74700.0}, {"time": 1762732800, "open": 75300.0, "high": 77000.0, "low": 71800.0, "close": 72400.0}, {"time": 1762819200, "open": 72400.0, "high": 74000.0, "low": 70200.0, "close": 71900.0}, {"time": 1762905600, "open": 71900.0, "high": 73600.0, "low": 70400.0, "close": 72200.0}, {"time": 1762992000, "open": 72200.0, "high": 72800.0, "low": 68300.0, "close": 68300.0}, {"time": 1763078400, "open": 67500.0, "high": 71900.0, "low": 65300.0, "close": 65900.0}, {"time": 1763337600, "open": 69100.0, "high": 71600.0, "low": 67800.0, "close": 69700.0}, {"time": 1763424000, "open": 69700.0, "high": 73900.0, "low": 69300.0, "close": 72700.0}, {"time": 1763510400, "open": 72800.0, "high": 73300.0, "low": 68400.0, "close": 72800.0}, {"time": 1763596800, "open": 72600.0, "high": 83100.0, "low": 72300.0, "close": 79800.0}, {"time": 1763683200, "open": 76800.0, "high": 78900.0, "low": 75600.0, "close": 76600.0}, {"time": 1763942400, "open": 77500.0, "high": 85300.0, "low": 77500.0, "close": 80500.0}, {"time": 1764028800, "open": 80800.0, "high": 88400.0, "low": 80700.0, "close": 86500.0}, {"time": 1764115200, "open": 86400.0, "high": 91700.0, "low": 83900.0, "close": 90700.0}, {"time": 1764201600, "open": 91000.0, "high": 94200.0, "low": 88000.0, "close": 92300.0}, {"time": 1764288000, "open": 92300.0, "high": 96500.0, "low": 89000.0, "close": 96000.0}, {"time": 1764547200, "open": 96200.0, "high": 97100.0, "low": 93500.0, "close": 94800.0}, {"time": 1764633600, "open": 94800.0, "high": 98200.0, "low": 92800.0, "close": 97800.0}, {"time": 1764720000, "open": 97000.0, "high": 97100.0, "low": 88800.0, "close": 89500.0}, {"time": 1764806400, "open": 89500.0, "high": 91100.0, "low": 85800.0, "close": 90500.0}, {"time": 1764892800, "open": 92000.0, "high": 92500.0, "low": 87500.0, "close": 91700.0}, {"time": 1765152000, "open": 91700.0, "high": 92900.0, "low": 88500.0, "close": 90000.0}, {"time": 1765238400, "open": 89100.0, "high": 94100.0, "low": 89100.0, "close": 92000.0}, {"time": 1765324800, "open": 92200.0, "high": 93600.0, "low": 91100.0, "close": 93000.0}, {"time": 1765411200, "open": 92800.0, "high": 96000.0, "low": 92200.0, "close": 95500.0}, {"time": 1765497600, "open": 96200.0, "high": 100400.0, "low": 95500.0, "close": 98300.0}, {"time": 1765756800, "open": 98200.0, "high": 102400.0, "low": 97100.0, "close": 100200.0}, {"time": 1765843200, "open": 100600.0, "high": 101300.0, "low": 96000.0, "close": 96100.0}, {"time": 1765929600, "open": 95300.0, "high": 96700.0, "low": 92800.0, "close": 94800.0}, {"time": 1766016000, "open": 92200.0, "high": 96900.0, "low": 92100.0, "close": 96400.0}, {"time": 1766102400, "open": 96200.0, "high": 109000.0, "low": 95600.0, "close": 104000.0}, {"time": 1766361600, "open": 104300.0, "high": 104600.0, "low": 98800.0, "close": 100300.0}, {"time": 1766448000, "open": 99900.0, "high": 101000.0, "low": 97500.0, "close": 99100.0}, {"time": 1766534400, "open": 99100.0, "high": 102000.0, "low": 98200.0, "close": 98800.0}, {"time": 1766707200, "open": 98800.0, "high": 102900.0, "low": 96800.0, "close": 101900.0}, {"time": 1766966400, "open": 105000.0, "high": 111300.0, "low": 105000.0, "close": 110400.0}, {"time": 1767052800, "open": 110600.0, "high": 117600.0, "low": 109900.0, "close": 117000.0}], "volume": [{"time": 1751846400, "value": 104389.0, "color": "#26a69a"}, {"time": 1751932800, "value": 81008.0, "color": "#26a69a"}, {"time": 1752019200, "value": 146608.0, "color": "#26a69a"}, {"time": 1752105600, "value": 72045.0, "color": "#ef5350"}, {"time": 1752192000, "value": 85341.0, "color": "#ef5350"}, {"time": 1752451200, "value": 315043.0, "color": "#ef5350"}, {"time": 1752537600, "value": 131310.0, "color": "#26a69a"}, {"time": 1752624000, "value": 107550.0, "color": "#26a69a"}, {"time": 1752710400, "value": 244699.0, "color": "#26a69a"}, {"time": 1752796800, "value": 125330.0, "color": "#26a69a"}, {"time": 1753056000, "value": 95507.0, "color": "#ef5350"}, {"time": 1753142400, "value": 96197.0, "color": "#ef5350"}, {"time": 1753228800, "value": 201024.0, "color": "#26a69a"}, {"time": 1753315200, "value": 152157.0, "color": "#ef5350"}, {"time": 1753401600, "value": 56806.0, "color": "#ef5350"}, {"time": 1753660800, "value": 75408.0, "color": "#26a69a"}, {"time": 1753747200, "value": 289250.0, "color": "#ef5350"}, {"time": 1753833600, "value": 78298.0, "color": "#ef5350"}, {"time": 1753920000, "value": 115409.0, "color": "#26a69a"}, {"time": 1754006400, "value": 96957.0, "color": "#ef5350"}, {"time": 1754265600, "value": 187220.0, "color": "#26a69a"}, {"time": 1754352000, "value": 75952.0, "color": "#26a69a"}, {"time": 1754438400, "value": 65168.0, "color": "#ef5350"}, {"time": 1754524800, "value": 49264.0, "color": "#ef5350"}, {"time": 1754611200, "value": 807622.0, "color": "#26a69a"}, {"time": 1754870400, "value": 171233.0, "color": "#26a69a"}, {"time": 1754956800, "value": 281138.0, "color": "#ef5350"}, {"time": 1755043200, "value": 139353.0, "color": "#ef5350"}, {"time": 1755129600, "value": 345900.0, "color": "#26a69a"}, {"time": 1755475200, "value": 718018.0, "color": "#ef5350"}, {"time": 1755561600, "value": 589875.0, "color": "#ef5350"}, {"time": 1755648000, "value": 279366.0, "color": "#ef5350"}, {"time": 1755734400, "value": 250292.0, "color": "#ef5350"}, {"time": 1755820800, "value": 294700.0, "color": "#26a69a"}, {"time": 1756080000, "value": 174643.0, "color": "#ef5350"}, {"time": 1756166400, "value": 338734.0, "color": "#26a69a"}, {"time": 1756252800, "value": 132437.0, "color": "#ef5350"}, {"time": 1756339200, "value": 100717.0, "color": "#ef5350"}, {"time": 1756425600, "value": 89546.0, "color": "#ef5350"}, {"time": 1756684800, "value": 93135.0, "color": "#ef5350"}, {"time": 1756771200, "value": 127984.0, "color": "#26a69a"}, {"time": 1756857600, "value": 166005.0, "color": "#26a69a"}, {"time": 1756944000, "value": 126787.0, "color": "#ef5350"}, {"time": 1757030400, "value": 249534.0, "color": "#26a69a"}, {"time": 1757289600, "value": 118426.0, "color": "#ef5350"}, {"time": 1757376000, "value": 76521.0, "color": "#ef5350"}, {"time": 1757462400, "value": 112867.0, "color": "#ef5350"}, {"time": 1757548800, "value": 578341.0, "color": "#ef5350"}, {"time": 1757635200, "value": 211590.0, "color": "#26a69a"}, {"time": 1757894400, "value": 262267.0, "color": "#26a69a"}, {"time": 1757980800, "value": 148597.0, "color": "#ef5350"}, {"time": 1758067200, "value": 119626.0, "color": "#ef5350"}, {"time": 1758153600, "value": 414052.0, "color": "#26a69a"}, {"time": 1758240000, "value": 182037.0, "color": "#26a69a"}, {"time": 1758499200, "value": 423429.0, "color": "#ef5350"}, {"time": 1758585600, "value": 695502.0, "color": "#26a69a"}, {"time": 1758672000, "value": 288034.0, "color": "#ef5350"}, {"time": 1758758400, "value": 905146.0, "color": "#26a69a"}, {"time": 1758844800, "value": 337809.0, "color": "#ef5350"}, {"time": 1759104000, "value": 156873.0, "color": "#26a69a"}, {"time": 1759190400, "value": 175936.0, "color": "#26a69a"}, {"time": 1759276800, "value": 376444.0, "color": "#26a69a"}, {"time": 1759363200, "value": 178507.0, "color": "#26a69a"}, {"time": 1760054400, "value": 310140.0, "color": "#26a69a"}, {"time": 1760313600, "value": 228106.0, "color": "#26a69a"}, {"time": 1760400000, "value": 746825.0, "color": "#ef5350"}, {"time": 1760486400, "value": 483690.0, "color": "#ef5350"}, {"time": 1760572800, "value": 362983.0, "color": "#ef5350"}, {"time": 1760659200, "value": 208704.0, "color": "#ef5350"}, {"time": 1760918400, "value": 343760.0, "color": "#26a69a"}, {"time": 1761004800, "value": 127040.0, "color": "#ef5350"}, {"time": 1761091200, "value": 104275.0, "color": "#26a69a"}, {"time": 1761177600, "value": 239653.0, "color": "#26a69a"}, {"time": 1761264000, "value": 288086.0, "color": "#ef5350"}, {"time": 1761523200, "value": 280537.0, "color": "#26a69a"}, {"time": 1761609600, "value": 310014.0, "color": "#ef5350"}, {"time": 1761696000, "value": 402399.0, "color": "#26a69a"}, {"time": 1761782400, "value": 318667.0, "color": "#ef5350"}, {"time": 1761868800, "value": 451526.0, "color": "#26a69a"}, {"time": 1762128000, "value": 254627.0, "color": "#ef5350"}, {"time": 1762214400, "value": 358889.0, "color": "#26a69a"}, {"time": 1762300800, "value": 320614.0, "color": "#ef5350"}, {"time": 1762387200, "value": 327110.0, "color": "#ef5350"}, {"time": 1762473600, "value": 268058.0, "color": "#26a69a"}, {"time": 1762732800, "value": 204061.0, "color": "#ef5350"}, {"time": 1762819200, "value": 151321.0, "color": "#ef5350"}, {"time": 1762905600, "value": 147116.0, "color": "#26a69a"}, {"time": 1762992000, "value": 239572.0, "color": "#ef5350"}, {"time": 1763078400, "value": 324913.0, "color": "#ef5350"}, {"time": 1763337600, "value": 243718.0, "color": "#26a69a"}, {"time": 1763424000, "value": 289579.0, "color": "#26a69a"}, {"time": 1763510400, "value": 175732.0, "color": "#26a69a"}, {"time": 1763596800, "value": 486657.0, "color": "#26a69a"}, {"time": 1763683200, "value": 244529.0, "color": "#ef5350"}, {"time": 1763942400, "value": 437829.0, "color": "#26a69a"}, {"time": 1764028800, "value": 425487.0, "color": "#26a69a"}, {"time": 1764115200, "value": 303489.0, "color": "#26a69a"}, {"time": 1764201600, "value": 268720.0, "color": "#26a69a"}, {"time": 1764288000, "value": 234313.0, "color": "#26a69a"}, {"time": 1764547200, "value": 216032.0, "color": "#ef5350"}, {"time": 1764633600, "value": 165775.0, "color": "#26a69a"}, {"time": 1764720000, "value": 380837.0, "color": "#ef5350"}, {"time": 1764806400, "value": 193951.0, "color": "#26a69a"}, {"time": 1764892800, "value": 151761.0, "color": "#ef5350"}, {"time": 1765152000, "value": 122968.0, "color": "#ef5350"}, {"time": 1765238400, "value": 160165.0, "color": "#26a69a"}, {"time": 1765324800, "value": 79126.0, "color": "#26a69a"}, {"time": 1765411200, "value": 113789.0, "color": "#26a69a"}, {"time": 1765497600, "value": 165120.0, "color": "#26a69a"}, {"time": 1765756800, "value": 156466.0, "color": "#26a69a"}, {"time": 1765843200, "value": 202425.0, "color": "#ef5350"}, {"time": 1765929600, "value": 185434.0, "color": "#ef5350"}, {"time": 1766016000, "value": 144040.0, "color": "#26a69a"}, {"time": 1766102400, "value": 335710.0, "color": "#26a69a"}, {"time": 1766361600, "value": 221748.0, "color": "#ef5350"}, {"time": 1766448000, "value": 128585.0, "color": "#ef5350"}, {"time": 1766534400, "value": 157702.0, "color": "#ef5350"}, {"time": 1766707200, "value": 206033.0, "color": "#26a69a"}, {"time": 1766966400, "value": 274261.0, "color": "#26a69a"}, {"time": 1767052800, "value": 179884.0, "color": "#26a69a"}], "ma50": [{"time": 1757894400, "value": 42737.0}, {"time": 1757980800, "value": 42934.0}, {"time": 1758067200, "value": 43126.0}, {"time": 1758153600, "value": 43380.0}, {"time": 1758240000, "value": 43648.0}, {"time": 1758499200, "value": 43917.0}, {"time": 1758585600, "value": 44394.0}, {"time": 1758672000, "value": 44819.0}, {"time": 1758758400, "value": 45370.0}, {"time": 1758844800, "value": 45788.0}, {"time": 1759104000, "value": 46231.0}, {"time": 1759190400, "value": 46741.0}, {"time": 1759276800, "value": 47368.0}, {"time": 1759363200, "value": 48008.0}, {"time": 1760054400, "value": 48892.0}, {"time": 1760313600, "value": 49722.0}, {"time": 1760400000, "value": 50346.0}, {"time": 1760486400, "value": 50994.0}, {"time": 1760572800, "value": 51637.0}, {"time": 1760659200, "value": 52213.0}, {"time": 1760918400, "value": 52866.0}, {"time": 1761004800, "value": 53436.0}, {"time": 1761091200, "value": 54030.0}, {"time": 1761177600, "value": 54652.0}, {"time": 1761264000, "value": 55209.0}, {"time": 1761523200, "value": 55597.0}, {"time": 1761609600, "value": 55945.0}, {"time": 1761696000, "value": 56401.0}, {"time": 1761782400, "value": 56763.0}, {"time": 1761868800, "value": 57191.0}, {"time": 1762128000, "value": 57875.0}, {"time": 1762214400, "value": 58689.0}, {"time": 1762300800, "value": 59493.0}, {"time": 1762387200, "value": 60216.0}, {"time": 1762473600, "value": 60910.0}, {"time": 1762732800, "value": 61546.0}, {"time": 1762819200, "value": 62113.0}, {"time": 1762905600, "value": 62701.0}, {"time": 1762992000, "value": 63237.0}, {"time": 1763078400, "value": 63709.0}, {"time": 1763337600, "value": 64283.0}, {"time": 1763424000, "value": 64895.0}, {"time": 1763510400, "value": 65469.0}, {"time": 1763596800, "value": 66193.0}, {"time": 1763683200, "value": 66795.0}, {"time": 1763942400, "value": 67495.0}, {"time": 1764028800, "value": 68316.0}, {"time": 1764115200, "value": 69239.0}, {"time": 1764201600, "value": 70120.0}, {"time": 1764288000, "value": 71022.0}, {"time": 1764547200, "value": 71854.0}, {"time": 1764633600, "value": 72778.0}, {"time": 1764720000, "value": 73544.0}, {"time": 1764806400, "value": 74216.0}, {"time": 1764892800, "value": 74910.0}, {"time": 1765152000, "value": 75568.0}, {"time": 1765238400, "value": 76156.0}, {"time": 1765324800, "value": 76808.0}, {"time": 1765411200, "value": 77384.0}, {"time": 1765497600, "value": 78092.0}, {"time": 1765756800, "value": 78796.0}, {"time": 1765843200, "value": 79370.0}, {"time": 1765929600, "value": 79832.0}, {"time": 1766016000, "value": 80338.0}, {"time": 1766102400, "value": 80752.0}, {"time": 1766361600, "value": 81150.0}, {"time": 1766448000, "value": 81728.0}, {"time": 1766534400, "value": 82330.0}, {"time": 1766707200, "value": 82988.0}, {"time": 1766966400, "value": 83850.0}, {"time": 1767052800, "value": 84784.0}], "ma150": []}, "402340": {"candles": [{"time": 1751846400, "open": 159600.0, "high": 163200.0, "low": 156800.0, "close": 162000.0}, {"time": 1751932800, "open": 162500.0, "high": 174000.0, "low": 162500.0, "close": 172900.0}, {"time": 1752019200, "open": 171300.0, "high": 181500.0, "low": 169100.0, "close": 181200.0}, {"time": 1752105600, "open": 181600.0, "high": 183600.0, "low": 177100.0, "close": 183600.0}, {"time": 1752192000, "open": 180000.0, "high": 189900.0, "low": 173700.0, "close": 174000.0}, {"time": 1752451200, "open": 175100.0, "high": 181300.0, "low": 175100.0, "close": 178300.0}, {"time": 1752537600, "open": 175300.0, "high": 175900.0, "low": 170700.0, "close": 173000.0}, {"time": 1752624000, "open": 173000.0, "high": 175600.0, "low": 171700.0, "close": 174100.0}, {"time": 1752710400, "open": 171700.0, "high": 171900.0, "low": 155700.0, "close": 158900.0}, {"time": 1752796800, "open": 158800.0, "high": 161900.0, "low": 157500.0, "close": 160500.0}, {"time": 1753056000, "open": 160900.0, "high": 162400.0, "low": 158700.0, "close": 161400.0}, {"time": 1753142400, "open": 158200.0, "high": 162600.0, "low": 155500.0, "close": 156800.0}, {"time": 1753228800, "open": 157300.0, "high": 157300.0, "low": 152600.0, "close": 156000.0}, {"time": 1753315200, "open": 157600.0, "high": 160500.0, "low": 151300.0, "close": 152000.0}, {"time": 1753401600, "open": 150500.0, "high": 154300.0, "low": 150400.0, "close": 153000.0}, {"time": 1753660800, "open": 153000.0, "high": 155600.0, "low": 148700.0, "close": 150200.0}, {"time": 1753747200, "open": 148600.0, "high": 149800.0, "low": 145400.0, "close": 149200.0}, {"time": 1753833600, "open": 147800.0, "high": 149600.0, "low": 146500.0, "close": 148000.0}, {"time": 1753920000, "open": 148300.0, "high": 154300.0, "low": 146300.0, "close": 152100.0}, {"time": 1754006400, "open": 149100.0, "high": 149500.0, "low": 140100.0, "close": 140300.0}, {"time": 1754265600, "open": 140000.0, "high": 141700.0, "low": 138200.0, "close": 140200.0}, {"time": 1754352000, "open": 143000.0, "high": 146400.0, "low": 141800.0, "close": 143500.0}, {"time": 1754438400, "open": 140700.0, "high": 143400.0, "low": 137200.0, "close": 140300.0}, {"time": 1754524800, "open": 139900.0, "high": 141900.0, "low": 136100.0, "close": 141900.0}, {"time": 1754611200, "open": 140500.0, "high": 143100.0, "low": 138200.0, "close": 139300.0}, {"time": 1754870400, "open": 140000.0, "high": 142900.0, "low": 138200.0, "close": 142000.0}, {"time": 1754956800, "open": 140700.0, "high": 147200.0, "low": 140700.0, "close": 141500.0}, {"time": 1755043200, "open": 144300.0, "high": 146200.0, "low": 142100.0, "close": 144600.0}, {"time": 1755129600, "open": 146000.0, "high": 146000.0, "low": 142700.0, "close": 143700.0}, {"time": 1755475200, "open": 142200.0, "high": 142300.0, "low": 136700.0, "close": 137600.0}, {"time": 1755561600, "open": 139300.0, "high": 141200.0, "low": 137700.0, "close": 140400.0}, {"time": 1755648000, "open": 141000.0, "high": 141300.0, "low": 130900.0, "close": 137100.0}, {"time": 1755734400, "open": 136500.0, "high": 137300.0, "low": 131500.0, "close": 135200.0}, {"time": 1755820800, "open": 135100.0, "high": 137800.0, "low": 133800.0, "close": 135200.0}, {"time": 1756080000, "open": 138500.0, "high": 146300.0, "low": 138300.0, "close": 144800.0}, {"time": 1756166400, "open": 143300.0, "high": 143400.0, "low": 140000.0, "close": 141200.0}, {"time": 1756252800, "open": 141600.0, "high": 143400.0, "low": 137600.0, "close": 139900.0}, {"time": 1756339200, "open": 138900.0, "high": 153000.0, "low": 138100.0, "close": 149600.0}, {"time": 1756425600, "open": 152300.0, "high": 153700.0, "low": 148900.0, "close": 149000.0}, {"time": 1756684800, "open": 145000.0, "high": 149000.0, "low": 142800.0, "close": 145000.0}, {"time": 1756771200, "open": 145000.0, "high": 145900.0, "low": 143600.0, "close": 143600.0}, {"time": 1756857600, "open": 143600.0, "high": 145500.0, "low": 141500.0, "close": 143900.0}, {"time": 1756944000, "open": 144000.0, "high": 151600.0, "low": 144000.0, "close": 149400.0}, {"time": 1757030400, "open": 151400.0, "high": 155000.0, "low": 151400.0, "close": 152800.0}, {"time": 1757289600, "open": 154400.0, "high": 154800.0, "low": 151400.0, "close": 153600.0}, {"time": 1757376000, "open": 155000.0, "high": 163400.0, "low": 154500.0, "close": 162000.0}, {"time": 1757462400, "open": 167900.0, "high": 175200.0, "low": 166500.0, "close": 174300.0}, {"time": 1757548800, "open": 177900.0, "high": 182100.0, "low": 176000.0, "close": 182100.0}, {"time": 1757635200, "open": 187200.0, "high": 200000.0, "low": 185700.0, "close": 197300.0}, {"time": 1757894400, "open": 197200.0, "high": 201000.0, "low": 191200.0, "close": 200500.0}, {"time": 1757980800, "open": 198300.0, "high": 210500.0, "low": 197300.0, "close": 206000.0}, {"time": 1758067200, "open": 200000.0, "high": 207000.0, "low": 199500.0, "close": 200500.0}, {"time": 1758153600, "open": 201000.0, "high": 210000.0, "low": 197100.0, "close": 208500.0}, {"time": 1758240000, "open": 209000.0, "high": 216500.0, "low": 207500.0, "close": 216500.0}, {"time": 1758499200, "open": 216000.0, "high": 218000.0, "low": 209500.0, "close": 215500.0}, {"time": 1758585600, "open": 216000.0, "high": 224000.0, "low": 216000.0, "close": 220000.0}, {"time": 1758672000, "open": 220500.0, "high": 225000.0, "low": 212000.0, "close": 217500.0}, {"time": 1758758400, "open": 209500.0, "high": 214500.0, "low": 205500.0, "close": 211000.0}, {"time": 1758844800, "open": 203500.0, "high": 208000.0, "low": 194900.0, "close": 195300.0}, {"time": 1759104000, "open": 197300.0, "high": 199500.0, "low": 195300.0, "close": 197100.0}, {"time": 1759190400, "open": 196200.0, "high": 204000.0, "low": 196000.0, "close": 201500.0}, {"time": 1759276800, "open": 203000.0, "high": 207500.0, "low": 201000.0, "close": 205500.0}, {"time": 1759363200, "open": 218000.0, "high": 248500.0, "low": 217500.0, "close": 238000.0}, {"time": 1760054400, "open": 245000.0, "high": 255000.0, "low": 240500.0, "close": 247000.0}, {"time": 1760313600, "open": 238000.0, "high": 249000.0, "low": 235000.0, "close": 245500.0}, {"time": 1760400000, "open": 244500.0, "high": 253500.0, "low": 229500.0, "close": 234500.0}, {"time": 1760486400, "open": 238500.0, "high": 246000.0, "low": 236500.0, "close": 243500.0}, {"time": 1760572800, "open": 238500.0, "high": 259500.0, "low": 238500.0, "close": 257500.0}, {"time": 1760659200, "open": 253500.0, "high": 267000.0, "low": 250500.0, "close": 257500.0}, {"time": 1760918400, "open": 261500.0, "high": 263500.0, "low": 250000.0, "close": 262000.0}, {"time": 1761004800, "open": 266500.0, "high": 268500.0, "low": 250500.0, "close": 256000.0}, {"time": 1761091200, "open": 256000.0, "high": 259000.0, "low": 251000.0, "close": 258500.0}, {"time": 1761177600, "open": 250500.0, "high": 258500.0, "low": 242500.0, "close": 253000.0}, {"time": 1761264000, "open": 259000.0, "high": 274000.0, "low": 257000.0, "close": 271000.0}, {"time": 1761523200, "open": 284500.0, "high": 295000.0, "low": 282500.0, "close": 291500.0}, {"time": 1761609600, "open": 278000.0, "high": 285000.0, "low": 270000.0, "close": 272000.0}, {"time": 1761696000, "open": 274000.0, "high": 282000.0, "low": 266500.0, "close": 275000.0}, {"time": 1761782400, "open": 270500.0, "high": 297500.0, "low": 269000.0, "close": 281000.0}, {"time": 1761868800, "open": 274000.0, "high": 283500.0, "low": 251500.0, "close": 260000.0}, {"time": 1762128000, "open": 259500.0, "high": 285500.0, "low": 250000.0, "close": 282500.0}, {"time": 1762214400, "open": 278500.0, "high": 282500.0, "low": 265500.0, "close": 274000.0}, {"time": 1762300800, "open": 266000.0, "high": 267000.0, "low": 241000.0, "close": 260000.0}, {"time": 1762387200, "open": 266000.0, "high": 279000.0, "low": 250000.0, "close": 270000.0}, {"time": 1762473600, "open": 270000.0, "high": 282000.0, "low": 261000.0, "close": 279000.0}, {"time": 1762732800, "open": 282500.0, "high": 302500.0, "low": 279000.0, "close": 290000.0}, {"time": 1762819200, "open": 312000.0, "high": 327000.0, "low": 307000.0, "close": 311500.0}, {"time": 1762905600, "open": 315000.0, "high": 324500.0, "low": 308500.0, "close": 322500.0}, {"time": 1762992000, "open": 322000.0, "high": 324000.0, "low": 312000.0, "close": 323500.0}, {"time": 1763078400, "open": 299000.0, "high": 304500.0, "low": 289500.0, "close": 291000.0}, {"time": 1763337600, "open": 300000.0, "high": 313000.0, "low": 295500.0, "close": 304500.0}, {"time": 1763424000, "open": 292000.0, "high": 298500.0, "low": 281500.0, "close": 283500.0}, {"time": 1763510400, "open": 283500.0, "high": 286500.0, "low": 269750.0, "close": 283000.0}, {"time": 1763596800, "open": 300500.0, "high": 311000.0, "low": 292500.0, "close": 293500.0}, {"time": 1763683200, "open": 275000.0, "high": 276500.0, "low": 263500.0, "close": 266000.0}, {"time": 1763942400, "open": 272500.0, "high": 284000.0, "low": 265500.0, "close": 276000.0}, {"time": 1764028800, "open": 293500.0, "high": 305000.0, "low": 289000.0, "close": 290500.0}, {"time": 1764115200, "open": 294000.0, "high": 295000.0, "low": 285000.0, "close": 291000.0}, {"time": 1764201600, "open": 298500.0, "high": 306000.0, "low": 295500.0, "close": 301000.0}, {"time": 1764288000, "open": 304500.0, "high": 305500.0, "low": 295000.0, "close": 298000.0}, {"time": 1764547200, "open": 305500.0, "high": 310000.0, "low": 298000.0, "close": 302000.0}, {"time": 1764633600, "open": 308500.0, "high": 313000.0, "low": 301000.0, "close": 308500.0}, {"time": 1764720000, "open": 310000.0, "high": 317500.0, "low": 298500.0, "close": 310500.0}, {"time": 1764806400, "open": 304500.0, "high": 312500.0, "low": 293000.0, "close": 312500.0}, {"time": 1764892800, "open": 307500.0, "high": 309000.0, "low": 295000.0, "close": 302000.0}, {"time": 1765152000, "open": 301500.0, "high": 322500.0, "low": 299000.0, "close": 322000.0}, {"time": 1765238400, "open": 321500.0, "high": 330000.0, "low": 320000.0, "close": 323000.0}, {"time": 1765324800, "open": 325000.0, "high": 333000.0, "low": 318000.0, "close": 324000.0}, {"time": 1765411200, "open": 324000.0, "high": 324000.0, "low": 307500.0, "close": 307500.0}, {"time": 1765497600, "open": 310500.0, "high": 317000.0, "low": 304000.0, "close": 308000.0}, {"time": 1765756800, "open": 287500.0, "high": 300000.0, "low": 273500.0, "close": 292500.0}, {"time": 1765843200, "open": 285000.0, "high": 293500.0, "low": 281000.0, "close": 281000.0}, {"time": 1765929600, "open": 281500.0, "high": 289500.0, "low": 280000.0, "close": 283000.0}, {"time": 1766016000, "open": 278000.0, "high": 296000.0, "low": 273500.0, "close": 290500.0}, {"time": 1766102400, "open": 299500.0, "high": 300000.0, "low": 290500.0, "close": 290500.0}, {"time": 1766361600, "open": 303000.0, "high": 318000.0, "low": 300500.0, "close": 315000.0}, {"time": 1766448000, "open": 315000.0, "high": 320000.0, "low": 313500.0, "close": 315000.0}, {"time": 1766534400, "open": 315000.0, "high": 323000.0, "low": 312500.0, "close": 321000.0}, {"time": 1766707200, "open": 333000.0, "high": 348000.0, "low": 330000.0, "close": 334500.0}, {"time": 1766966400, "open": 345500.0, "high": 350000.0, "low": 340500.0, "close": 346000.0}, {"time": 1767052800, "open": 346000.0, "high": 370000.0, "low": 340000.0, "close": 368000.0}], "volume": [{"time": 1751846400, "value": 357800.0, "color": "#26a69a"}, {"time": 1751932800, "value": 1238643.0, "color": "#26a69a"}, {"time": 1752019200, "value": 559727.0, "color": "#26a69a"}, {"time": 1752105600, "value": 418896.0, "color": "#26a69a"}, {"time": 1752192000, "value": 3230160.0, "color": "#ef5350"}, {"time": 1752451200, "value": 336773.0, "color": "#26a69a"}, {"time": 1752537600, "value": 473753.0, "color": "#ef5350"}, {"time": 1752624000, "value": 362771.0, "color": "#26a69a"}, {"time": 1752710400, "value": 933933.0, "color": "#ef5350"}, {"time": 1752796800, "value": 502251.0, "color": "#26a69a"}, {"time": 1753056000, "value": 385203.0, "color": "#26a69a"}, {"time": 1753142400, "value": 373178.0, "color": "#ef5350"}, {"time": 1753228800, "value": 460621.0, "color": "#ef5350"}, {"time": 1753315200, "value": 534864.0, "color": "#ef5350"}, {"time": 1753401600, "value": 315465.0, "color": "#26a69a"}, {"time": 1753660800, "value": 337594.0, "color": "#ef5350"}, {"time": 1753747200, "value": 277930.0, "color": "#26a69a"}, {"time": 1753833600, "value": 324197.0, "color": "#26a69a"}, {"time": 1753920000, "value": 469088.0, "color": "#26a69a"}, {"time": 1754006400, "value": 525224.0, "color": "#ef5350"}, {"time": 1754265600, "value": 447622.0, "color": "#26a69a"}, {"time": 1754352000, "value": 308156.0, "color": "#26a69a"}, {"time": 1754438400, "value": 307025.0, "color": "#ef5350"}, {"time": 1754524800, "value": 324029.0, "color": "#26a69a"}, {"time": 1754611200, "value": 380463.0, "color": "#ef5350"}, {"time": 1754870400, "value": 312233.0, "color": "#26a69a"}, {"time": 1754956800, "value": 369609.0, "color": "#26a69a"}, {"time": 1755043200, "value": 349821.0, "color": "#26a69a"}, {"time": 1755129600, "value": 320084.0, "color": "#ef5350"}, {"time": 1755475200, "value": 365978.0, "color": "#ef5350"}, {"time": 1755561600, "value": 392054.0, "color": "#26a69a"}, {"time": 1755648000, "value": 785076.0, "color": "#ef5350"}, {"time": 1755734400, "value": 457243.0, "color": "#ef5350"}, {"time": 1755820800, "value": 205651.0, "color": "#26a69a"}, {"time": 1756080000, "value": 448583.0, "color": "#26a69a"}, {"time": 1756166400, "value": 524797.0, "color": "#ef5350"}, {"time": 1756252800, "value": 234561.0, "color": "#ef5350"}, {"time": 1756339200, "value": 786806.0, "color": "#26a69a"}, {"time": 1756425600, "value": 427314.0, "color": "#ef5350"}, {"time": 1756684800, "value": 227876.0, "color": "#26a69a"}, {"time": 1756771200, "value": 188841.0, "color": "#ef5350"}, {"time": 1756857600, "value": 211578.0, "color": "#26a69a"}, {"time": 1756944000, "value": 311683.0, "color": "#26a69a"}, {"time": 1757030400, "value": 350950.0, "color": "#26a69a"}, {"time": 1757289600, "value": 190095.0, "color": "#ef5350"}, {"time": 1757376000, "value": 668427.0, "color": "#26a69a"}, {"time": 1757462400, "value": 948822.0, "color": "#26a69a"}, {"time": 1757548800, "value": 672306.0, "color": "#26a69a"}, {"time": 1757635200, "value": 820778.0, "color": "#26a69a"}, {"time": 1757894400, "value": 548068.0, "color": "#26a69a"}, {"time": 1757980800, "value": 594560.0, "color": "#26a69a"}, {"time": 1758067200, "value": 719626.0, "color": "#26a69a"}, {"time": 1758153600, "value": 591173.0, "color": "#26a69a"}, {"time": 1758240000, "value": 733301.0, "color": "#26a69a"}, {"time": 1758499200, "value": 454188.0, "color": "#ef5350"}, {"time": 1758585600, "value": 434395.0, "color": "#26a69a"}, {"time": 1758672000, "value": 594973.0, "color": "#ef5350"}, {"time": 1758758400, "value": 595712.0, "color": "#26a69a"}, {"time": 1758844800, "value": 823131.0, "color": "#ef5350"}, {"time": 1759104000, "value": 403243.0, "color": "#ef5350"}, {"time": 1759190400, "value": 409786.0, "color": "#26a69a"}, {"time": 1759276800, "value": 284452.0, "color": "#26a69a"}, {"time": 1759363200, "value": 1434172.0, "color": "#26a69a"}, {"time": 1760054400, "value": 1339989.0, "color": "#26a69a"}, {"time": 1760313600, "value": 666623.0, "color": "#26a69a"}, {"time": 1760400000, "value": 461033.0, "color": "#ef5350"}, {"time": 1760486400, "value": 373309.0, "color": "#26a69a"}, {"time": 1760572800, "value": 632288.0, "color": "#26a69a"}, {"time": 1760659200, "value": 560679.0, "color": "#26a69a"}, {"time": 1760918400, "value": 404341.0, "color": "#26a69a"}, {"time": 1761004800, "value": 542748.0, "color": "#ef5350"}, {"time": 1761091200, "value": 406816.0, "color": "#26a69a"}, {"time": 1761177600, "value": 521837.0, "color": "#26a69a"}, {"time": 1761264000, "value": 524517.0, "color": "#26a69a"}, {"time": 1761523200, "value": 611042.0, "color": "#26a69a"}, {"time": 1761609600, "value": 491298.0, "color": "#ef5350"}, {"time": 1761696000, "value": 600207.0, "color": "#26a69a"}, {"time": 1761782400, "value": 569613.0, "color": "#26a69a"}, {"time": 1761868800, "value": 820516.0, "color": "#ef5350"}, {"time": 1762128000, "value": 950548.0, "color": "#26a69a"}, {"time": 1762214400, "value": 520765.0, "color": "#ef5350"}, {"time": 1762300800, "value": 852937.0, "color": "#ef5350"}, {"time": 1762387200, "value": 652957.0, "color": "#26a69a"}, {"time": 1762473600, "value": 546490.0, "color": "#26a69a"}, {"time": 1762732800, "value": 544410.0, "color": "#26a69a"}, {"time": 1762819200, "value": 1187646.0, "color": "#ef5350"}, {"time": 1762905600, "value": 752525.0, "color": "#26a69a"}, {"time": 1762992000, "value": 551413.0, "color": "#26a69a"}, {"time": 1763078400, "value": 595985.0, "color": "#ef5350"}, {"time": 1763337600, "value": 498174.0, "color": "#26a69a"}, {"time": 1763424000, "value": 721593.0, "color": "#ef5350"}, {"time": 1763510400, "value": 597490.0, "color": "#ef5350"}, {"time": 1763596800, "value": 673727.0, "color": "#ef5350"}, {"time": 1763683200, "value": 654899.0, "color": "#ef5350"}, {"time": 1763942400, "value": 1074605.0, "color": "#26a69a"}, {"time": 1764028800, "value": 710228.0, "color": "#ef5350"}, {"time": 1764115200, "value": 536219.0, "color": "#ef5350"}, {"time": 1764201600, "value": 485209.0, "color": "#26a69a"}, {"time": 1764288000, "value": 389771.0, "color": "#ef5350"}, {"time": 1764547200, "value": 423148.0, "color": "#ef5350"}, {"time": 1764633600, "value": 504155.0, "color": "#26a69a"}, {"time": 1764720000, "value": 288129.0, "color": "#26a69a"}, {"time": 1764806400, "value": 437651.0, "color": "#26a69a"}, {"time": 1764892800, "value": 384010.0, "color": "#ef5350"}, {"time": 1765152000, "value": 517651.0, "color": "#26a69a"}, {"time": 1765238400, "value": 456838.0, "color": "#26a69a"}, {"time": 1765324800, "value": 439546.0, "color": "#ef5350"}, {"time": 1765411200, "value": 321042.0, "color": "#ef5350"}, {"time": 1765497600, "value": 203829.0, "color": "#ef5350"}, {"time": 1765756800, "value": 469687.0, "color": "#26a69a"}, {"time": 1765843200, "value": 331849.0, "color": "#ef5350"}, {"time": 1765929600, "value": 448891.0, "color": "#26a69a"}, {"time": 1766016000, "value": 339592.0, "color": "#26a69a"}, {"time": 1766102400, "value": 320036.0, "color": "#ef5350"}, {"time": 1766361600, "value": 351419.0, "color": "#26a69a"}, {"time": 1766448000, "value": 240036.0, "color": "#26a69a"}, {"time": 1766534400, "value": 215171.0, "color": "#26a69a"}, {"time": 1766707200, "value": 458435.0, "color": "#26a69a"}, {"time": 1766966400, "value": 370258.0, "color": "#26a69a"}, {"time": 1767052800, "value": 557353.0, "color": "#26a69a"}], "ma50": [{"time": 1757894400, "value": 154580.0}, {"time": 1757980800, "value": 155460.0}, {"time": 1758067200, "value": 156012.0}, {"time": 1758153600, "value": 156558.0}, {"time": 1758240000, "value": 157216.0}, {"time": 1758499200, "value": 158046.0}, {"time": 1758585600, "value": 158880.0}, {"time": 1758672000, "value": 159770.0}, {"time": 1758758400, "value": 160508.0}, {"time": 1758844800, "value": 161236.0}, {"time": 1759104000, "value": 161968.0}, {"time": 1759190400, "value": 162770.0}, {"time": 1759276800, "value": 163744.0}, {"time": 1759363200, "value": 165384.0}, {"time": 1760054400, "value": 167284.0}, {"time": 1760313600, "value": 169134.0}, {"time": 1760400000, "value": 170820.0}, {"time": 1760486400, "value": 172706.0}, {"time": 1760572800, "value": 174896.0}, {"time": 1760659200, "value": 177004.0}, {"time": 1760918400, "value": 179438.0}, {"time": 1761004800, "value": 181754.0}, {"time": 1761091200, "value": 184054.0}, {"time": 1761177600, "value": 186308.0}, {"time": 1761264000, "value": 188890.0}, {"time": 1761523200, "value": 191934.0}, {"time": 1761609600, "value": 194534.0}, {"time": 1761696000, "value": 197204.0}, {"time": 1761782400, "value": 199932.0}, {"time": 1761868800, "value": 202258.0}, {"time": 1762128000, "value": 205156.0}, {"time": 1762214400, "value": 207828.0}, {"time": 1762300800, "value": 210286.0}, {"time": 1762387200, "value": 212982.0}, {"time": 1762473600, "value": 215858.0}, {"time": 1762732800, "value": 218762.0}, {"time": 1762819200, "value": 222168.0}, {"time": 1762905600, "value": 225820.0}, {"time": 1762992000, "value": 229298.0}, {"time": 1763078400, "value": 232138.0}, {"time": 1763337600, "value": 235328.0}, {"time": 1763424000, "value": 238126.0}, {"time": 1763510400, "value": 240908.0}, {"time": 1763596800, "value": 243790.0}, {"time": 1763683200, "value": 246054.0}, {"time": 1763942400, "value": 248502.0}, {"time": 1764028800, "value": 251072.0}, {"time": 1764115200, "value": 253406.0}, {"time": 1764201600, "value": 255784.0}, {"time": 1764288000, "value": 257798.0}, {"time": 1764547200, "value": 259828.0}, {"time": 1764633600, "value": 261878.0}, {"time": 1764720000, "value": 264078.0}, {"time": 1764806400, "value": 266158.0}, {"time": 1764892800, "value": 267868.0}, {"time": 1765152000, "value": 269998.0}, {"time": 1765238400, "value": 272058.0}, {"time": 1765324800, "value": 274188.0}, {"time": 1765411200, "value": 276118.0}, {"time": 1765497600, "value": 278372.0}, {"time": 1765756800, "value": 280280.0}, {"time": 1765843200, "value": 281870.0}, {"time": 1765929600, "value": 283420.0}, {"time": 1766016000, "value": 284470.0}, {"time": 1766102400, "value": 285340.0}, {"time": 1766361600, "value": 286730.0}, {"time": 1766448000, "value": 288340.0}, {"time": 1766534400, "value": 289890.0}, {"time": 1766707200, "value": 291430.0}, {"time": 1766966400, "value": 293200.0}, {"time": 1767052800, "value": 295320.0}], "ma150": []}};
+
+        Object.keys(chartData).forEach(ticker => {
+            const data = chartData[ticker];
+
+            // 캔들스틱 차트
+            const chartEl = document.getElementById('chart-' + ticker);
+            const chart = LightweightCharts.createChart(chartEl, {
+                layout: { background: { color: '#1e222d' }, textColor: '#d1d4dc' },
+                grid: { vertLines: { color: '#2a2e39' }, horzLines: { color: '#2a2e39' } },
+                crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+                timeScale: { borderColor: '#2a2e39' },
+                rightPriceScale: { borderColor: '#2a2e39' }
+            });
+
+            const candleSeries = chart.addCandlestickSeries({
+                upColor: '#26a69a',
+                downColor: '#ef5350',
+                borderVisible: false,
+                wickUpColor: '#26a69a',
+                wickDownColor: '#ef5350'
+            });
+            candleSeries.setData(data.candles);
+
+            // 50일 이평선
+            if (data.ma50 && data.ma50.length > 0) {
+                const ma50 = chart.addLineSeries({ color: '#26a69a', lineWidth: 2 });
+                ma50.setData(data.ma50);
+            }
+
+            // 150일 이평선
+            if (data.ma150 && data.ma150.length > 0) {
+                const ma150 = chart.addLineSeries({ color: '#ff9800', lineWidth: 2 });
+                ma150.setData(data.ma150);
+            }
+
+            chart.timeScale().fitContent();
+
+            // 거래량 차트
+            const volumeEl = document.getElementById('volume-' + ticker);
+            const volumeChart = LightweightCharts.createChart(volumeEl, {
+                layout: { background: { color: '#1e222d' }, textColor: '#d1d4dc' },
+                grid: { vertLines: { color: '#2a2e39' }, horzLines: { color: '#2a2e39' } },
+                timeScale: { borderColor: '#2a2e39', visible: false },
+                rightPriceScale: { borderColor: '#2a2e39' }
+            });
+
+            const volumeSeries = volumeChart.addHistogramSeries({
+                priceFormat: { type: 'volume' },
+                priceScaleId: ''
+            });
+            volumeSeries.setData(data.volume);
+
+            volumeChart.timeScale().fitContent();
+        });
+    </script>
+</body>
+</html>

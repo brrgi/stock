@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>차트 테스트</title>
+    <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        body {
+            background: #0a0e27;
+            color: white;
+            padding: 20px;
+            font-family: sans-serif;
+        }
+        .chart-container {
+            background: #1e222d;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        #chart {
+            height: 400px;
+        }
+        #volume {
+            height: 150px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>TradingView Lightweight Charts 테스트</h1>
+    <div class="chart-container">
+        <h2>캔들스틱 차트</h2>
+        <div id="chart"></div>
+        <div id="volume"></div>
+    </div>
+
+    <script>
+        console.log('LightweightCharts 로드:', typeof LightweightCharts);
+
+        try {
+            // 테스트 데이터
+            const testData = [
+                { time: '2024-01-01', open: 100, high: 110, low: 95, close: 105 },
+                { time: '2024-01-02', open: 105, high: 115, low: 100, close: 112 },
+                { time: '2024-01-03', open: 112, high: 120, low: 110, close: 118 },
+                { time: '2024-01-04', open: 118, high: 125, low: 115, close: 120 },
+                { time: '2024-01-05', open: 120, high: 128, low: 118, close: 125 }
+            ];
+
+            const volumeData = [
+                { time: '2024-01-01', value: 1000000, color: '#26a69a' },
+                { time: '2024-01-02', value: 1200000, color: '#26a69a' },
+                { time: '2024-01-03', value: 900000, color: '#26a69a' },
+                { time: '2024-01-04', value: 1100000, color: '#26a69a' },
+                { time: '2024-01-05', value: 1300000, color: '#26a69a' }
+            ];
+
+            // 차트 생성
+            const chartEl = document.getElementById('chart');
+            const chart = LightweightCharts.createChart(chartEl, {
+                layout: {
+                    background: { color: '#1e222d' },
+                    textColor: '#d1d4dc'
+                },
+                grid: {
+                    vertLines: { color: '#2a2e39' },
+                    horzLines: { color: '#2a2e39' }
+                },
+                width: chartEl.clientWidth,
+                height: 400
+            });
+
+            const candleSeries = chart.addCandlestickSeries({
+                upColor: '#26a69a',
+                downColor: '#ef5350',
+                borderVisible: false,
+                wickUpColor: '#26a69a',
+                wickDownColor: '#ef5350'
+            });
+
+            candleSeries.setData(testData);
+            console.log('캔들스틱 데이터 설정 완료');
+
+            // 거래량 차트
+            const volumeEl = document.getElementById('volume');
+            const volumeChart = LightweightCharts.createChart(volumeEl, {
+                layout: {
+                    background: { color: '#1e222d' },
+                    textColor: '#d1d4dc'
+                },
+                grid: {
+                    vertLines: { color: '#2a2e39' },
+                    horzLines: { color: '#2a2e39' }
+                },
+                width: volumeEl.clientWidth,
+                height: 150
+            });
+
+            const volumeSeries = volumeChart.addHistogramSeries({
+                priceFormat: { type: 'volume' }
+            });
+
+            volumeSeries.setData(volumeData);
+            console.log('거래량 데이터 설정 완료');
+
+            // 리사이즈 처리
+            window.addEventListener('resize', () => {
+                chart.applyOptions({ width: chartEl.clientWidth });
+                volumeChart.applyOptions({ width: volumeEl.clientWidth });
+            });
+
+            console.log('차트 생성 성공!');
+
+        } catch (error) {
+            console.error('차트 생성 실패:', error);
+            document.body.innerHTML += '<div style="color: red; padding: 20px;">에러: ' + error.message + '</div>';
+        }
+    </script>
+</body>
+</html>

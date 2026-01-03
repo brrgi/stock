@@ -1,0 +1,709 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>주식 진입 신호 상세 분석</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .stock-card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+        }
+
+        .stock-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #f0f0f0;
+        }
+
+        .stock-name {
+            font-size: 2em;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .stock-code {
+            color: #666;
+            font-size: 1.2em;
+            margin-top: 5px;
+        }
+
+        .rs-badge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 30px;
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+
+        .analysis-section {
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-icon {
+            font-size: 1.3em;
+        }
+
+        .checklist {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+        }
+
+        .check-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            margin-bottom: 10px;
+            background: white;
+            border-radius: 8px;
+            border-left: 4px solid #ddd;
+            transition: all 0.3s;
+        }
+
+        .check-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .check-item.passed {
+            border-left-color: #4CAF50;
+        }
+
+        .check-item.failed {
+            border-left-color: #f44336;
+        }
+
+        .check-item.excellent {
+            border-left-color: #FF9800;
+            background: #FFF3E0;
+        }
+
+        .check-icon {
+            font-size: 1.5em;
+            margin-right: 15px;
+            min-width: 30px;
+            text-align: center;
+        }
+
+        .check-label {
+            flex: 1;
+            font-size: 1.05em;
+            color: #333;
+        }
+
+        .check-value {
+            font-weight: bold;
+            margin-left: 10px;
+            color: #666;
+        }
+
+        .strategy-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .price-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .price-item {
+            text-align: center;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+        }
+
+        .price-label {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 8px;
+        }
+
+        .price-value {
+            font-size: 1.4em;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .price-value.entry {
+            color: #2196F3;
+        }
+
+        .price-value.stop {
+            color: #f44336;
+        }
+
+        .chart-container {
+            margin-top: 30px;
+            padding: 25px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .chart-title {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 15px 25px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: bold;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        .btn-tradingview {
+            background: #2962FF;
+            color: white;
+        }
+
+        .btn-tradingview:hover {
+            background: #1E53E5;
+            transform: translateY(-2px);
+        }
+
+        .btn-naver {
+            background: #03C75A;
+            color: white;
+        }
+
+        .btn-naver:hover {
+            background: #02B350;
+            transform: translateY(-2px);
+        }
+
+        .summary-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .badge-excellent {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .badge-good {
+            background: #2196F3;
+            color: white;
+        }
+
+        .badge-warning {
+            background: #FF9800;
+            color: white;
+        }
+
+        @media (max-width: 1024px) {
+            .strategy-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 주식 진입 신호 상세 분석</h1>
+            <div style="color: #666; font-size: 1.1em; margin-top: 10px;">
+                David Ryan & Mark Minervini 전략 체크리스트
+            </div>
+            <div style="color: #999; font-size: 0.9em; margin-top: 10px;">
+                생성일시: 2026년 01월 01일 02:18:27
+            </div>
+        </div>
+
+        <div class="stock-card">
+            <div class="stock-header">
+                <div>
+                    <div class="stock-name">큐리옥스바이오시스템즈</div>
+                    <div class="stock-code">445680</div>
+                </div>
+                <div class="rs-badge">RS 96</div>
+            </div>
+
+            <div class="price-info">
+                <div class="price-item">
+                    <div class="price-label">현재가</div>
+                    <div class="price-value">117,000원</div>
+                </div>
+
+                <div class="price-item">
+                    <div class="price-label">Ryan 진입가</div>
+                    <div class="price-value entry">117,718원</div>
+                </div>
+                <div class="price-item">
+                    <div class="price-label">Ryan 손절가</div>
+                    <div class="price-value stop">108,780원</div>
+                </div>
+
+                <div class="price-item">
+                    <div class="price-label">Minervini 진입가</div>
+                    <div class="price-value entry">117,718원</div>
+                </div>
+                <div class="price-item">
+                    <div class="price-label">Minervini 손절가</div>
+                    <div class="price-value stop">108,192원</div>
+                </div>
+
+            </div>
+
+            <div class="strategy-grid">
+
+                <div class="analysis-section">
+                    <div class="section-title">
+                        <span class="section-icon">🎯</span>
+                        David Ryan 전략
+                        <span class="summary-badge badge-good">
+                            4/7 조건 충족
+                        </span>
+                    </div>
+                    <div class="checklist">
+
+                        <div class="check-item excellent">
+                            <div class="check-icon">🌟</div>
+                            <div class="check-label">RS Rating 96</div>
+                        </div>
+
+                        <div class="check-item failed">
+                            <div class="check-icon">✗</div>
+                            <div class="check-label">High Tight Flag 패턴 미형성</div>
+                        </div>
+
+                        <div class="check-item passed">
+                            <div class="check-icon">✓</div>
+                            <div class="check-label">베이스 품질 Good (깊이 31.4%)</div>
+                        </div>
+
+                        <div class="check-item failed">
+                            <div class="check-icon">✗</div>
+                            <div class="check-label">거래량 건조 미확인</div>
+                        </div>
+
+                        <div class="check-item passed">
+                            <div class="check-icon">✓</div>
+                            <div class="check-label">피봇 포인트 0.5% 거리</div>
+                        </div>
+
+                        <div class="check-item failed">
+                            <div class="check-icon">✗</div>
+                            <div class="check-label">거래량 돌파 미확인</div>
+                        </div>
+
+                        <div class="check-item passed">
+                            <div class="check-icon">✓</div>
+                            <div class="check-label">52주 최고가 0.5% 이내</div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div class="analysis-section">
+                    <div class="section-title">
+                        <span class="section-icon">📈</span>
+                        Mark Minervini 전략
+                        <span class="summary-badge badge-excellent">
+                            9/10 조건 충족
+                        </span>
+                    </div>
+                    <div class="checklist">
+
+                        <div class="check-item passed">
+                            <div class="check-icon">✓</div>
+                            <div class="check-label">현재가(117,000) > 150일 이평(58,222)</div>
+                        </div>
+
+                        <div class="check-item passed">
+                            <div class="check-icon">✓</div>
+                            <div class="check-label">현재가(117,000) > 200일 이평(48,897)</div>
+                        </div>
+
+                        <div class="check-item passed">
+                            <div class="check-icon">✓</div>
+                            <div class="check-label">150일 이평(58,222) > 200일 이평(48,897)</div>
+                        </div>
+
+                        <div class="check-item passed">
+                            <div class="check-icon">✓</div>
+                            <div class="check-label">200일 이평선 상승 추세 확인</div>
+                        </div>
+
+                        <div class="check-item passed">
+                            <div class="check-icon">✓</div>
+                            <div class="check-label">50일 이평(84,784) > 150일 이평(58,222)</div>
+                        </div>
+
+                        <div class="check-item passed">
+                            <div class="check-icon">✓</div>
+                            <div class="check-label">현재가(117,000) > 50일 이평(84,784)</div>
+                        </div>
+
+                        <div class="check-item passed">
+                            <div class="check-icon">✓</div>
+                            <div class="check-label">52주 최저 대비 +786.4% (30% 이상 필요)</div>
+                        </div>
+
+                        <div class="check-item passed">
+                            <div class="check-icon">✓</div>
+                            <div class="check-label">52주 최고가 대비 0.5% 이내 (25% 이내 필요)</div>
+                        </div>
+
+                        <div class="check-item failed">
+                            <div class="check-icon">✗</div>
+                            <div class="check-label">VCP 패턴 미형성</div>
+                        </div>
+
+                        <div class="check-item excellent">
+                            <div class="check-icon">🌟</div>
+                            <div class="check-label">RS Rating 96 (80 이상 필요)</div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <div class="chart-title">📊 가격 및 거래량 차트 (최근 120일)</div>
+                <canvas id="chart-445680" style="max-height: 400px;"></canvas>
+                <div class="btn-group">
+                    <a href="https://www.tradingview.com/chart/?symbol=KRX%3A445680" target="_blank" class="btn btn-tradingview">
+                        TradingView에서 상세 분석 →
+                    </a>
+                    <a href="https://finance.naver.com/item/main.nhn?code=445680" target="_blank" class="btn btn-naver">
+                        네이버 금융에서 보기 →
+                    </a>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="stock-card">
+            <div class="stock-header">
+                <div>
+                    <div class="stock-name">SK스퀘어</div>
+                    <div class="stock-code">402340</div>
+                </div>
+                <div class="rs-badge">RS 95</div>
+            </div>
+
+            <div class="price-info">
+                <div class="price-item">
+                    <div class="price-label">현재가</div>
+                    <div class="price-value">368,000원</div>
+                </div>
+
+                <div class="price-item">
+                    <div class="price-label">Ryan 진입가</div>
+                    <div class="price-value entry">370,370원</div>
+                </div>
+                <div class="price-item">
+                    <div class="price-label">Ryan 손절가</div>
+                    <div class="price-value stop">342,250원</div>
+                </div>
+
+                <div class="price-item">
+                    <div class="price-label">Minervini 진입가</div>
+                    <div class="price-value entry">370,370원</div>
+                </div>
+                <div class="price-item">
+                    <div class="price-label">Minervini 손절가</div>
+                    <div class="price-value stop">340,400원</div>
+                </div>
+
+            </div>
+
+            <div class="strategy-grid">
+
+                <div class="analysis-section">
+                    <div class="section-title">
+                        <span class="section-icon">🎯</span>
+                        David Ryan 전략
+                        <span class="summary-badge badge-good">
+                            4/7 조건 충족
+                        </span>
+                    </div>
+                    <div class="checklist">
+
+                        <div class="check-item excellent">
+                            <div class="check-icon">🌟</div>
+                            <div class="check-label">RS Rating 95</div>
+                        </div>
+
+                        <div class="check-item failed">
+                            <div class="check-icon">✗</div>
+                            <div class="check-label">High Tight Flag 패턴 미형성</div>
+                        </div>
+
+                        <div class="check-item passed">
+                            <div class="check-icon">✓</div>
+                            <div class="check-label">베이스 품질 Good (깊이 26.1%)</div>
+                        </div>
+
+                        <div class="check-item failed">
+                            <div class="check-icon">✗</div>
+                            <div class="check-label">거래량 건조 미확인</div>
+                        </div>
+
+                        <div class="check-item passed">
+                            <div class="check-icon">✓</div>
+                            <div class="check-label">피봇 포인트 0.5% 거리</div>
+                        </div>
+
+                        <div class="check-item failed">
+                            <div class="check-icon">✗</div>
+                            <div class="check-label">거래량 돌파 미확인</div>
+                        </div>
+
+                        <div class="check-item passed">
+                            <div class="check-icon">✓</div>
+                            <div class="check-label">52주 최고가 0.5% 이내</div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div class="analysis-section">
+                    <div class="section-title">
+                        <span class="section-icon">📈</span>
+                        Mark Minervini 전략
+                        <span class="summary-badge badge-excellent">
+                            9/10 조건 충족
+                        </span>
+                    </div>
+                    <div class="checklist">
+
+                        <div class="check-item passed">
+                            <div class="check-icon">✓</div>
+                            <div class="check-label">현재가(368,000) > 150일 이평(208,583)</div>
+                        </div>
+
+                        <div class="check-item passed">
+                            <div class="check-icon">✓</div>
+                            <div class="check-label">현재가(368,000) > 200일 이평(179,264)</div>
+                        </div>
+
+                        <div class="check-item passed">
+                            <div class="check-icon">✓</div>
+                            <div class="check-label">150일 이평(208,583) > 200일 이평(179,264)</div>
+                        </div>
+
+                        <div class="check-item passed">
+                            <div class="check-icon">✓</div>
+                            <div class="check-label">200일 이평선 상승 추세 확인</div>
+                        </div>
+
+                        <div class="check-item passed">
+                            <div class="check-icon">✓</div>
+                            <div class="check-label">50일 이평(295,320) > 150일 이평(208,583)</div>
+                        </div>
+
+                        <div class="check-item passed">
+                            <div class="check-icon">✓</div>
+                            <div class="check-label">현재가(368,000) > 50일 이평(295,320)</div>
+                        </div>
+
+                        <div class="check-item passed">
+                            <div class="check-icon">✓</div>
+                            <div class="check-label">52주 최저 대비 +397.3% (30% 이상 필요)</div>
+                        </div>
+
+                        <div class="check-item passed">
+                            <div class="check-icon">✓</div>
+                            <div class="check-label">52주 최고가 대비 0.5% 이내 (25% 이내 필요)</div>
+                        </div>
+
+                        <div class="check-item failed">
+                            <div class="check-icon">✗</div>
+                            <div class="check-label">VCP 패턴 미형성</div>
+                        </div>
+
+                        <div class="check-item excellent">
+                            <div class="check-icon">🌟</div>
+                            <div class="check-label">RS Rating 95 (80 이상 필요)</div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <div class="chart-title">📊 가격 및 거래량 차트 (최근 120일)</div>
+                <canvas id="chart-402340" style="max-height: 400px;"></canvas>
+                <div class="btn-group">
+                    <a href="https://www.tradingview.com/chart/?symbol=KRX%3A402340" target="_blank" class="btn btn-tradingview">
+                        TradingView에서 상세 분석 →
+                    </a>
+                    <a href="https://finance.naver.com/item/main.nhn?code=402340" target="_blank" class="btn btn-naver">
+                        네이버 금융에서 보기 →
+                    </a>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <script>
+        const chartData = {"445680": {"dates": ["2025-07-07", "2025-07-08", "2025-07-09", "2025-07-10", "2025-07-11", "2025-07-14", "2025-07-15", "2025-07-16", "2025-07-17", "2025-07-18", "2025-07-21", "2025-07-22", "2025-07-23", "2025-07-24", "2025-07-25", "2025-07-28", "2025-07-29", "2025-07-30", "2025-07-31", "2025-08-01", "2025-08-04", "2025-08-05", "2025-08-06", "2025-08-07", "2025-08-08", "2025-08-11", "2025-08-12", "2025-08-13", "2025-08-14", "2025-08-18", "2025-08-19", "2025-08-20", "2025-08-21", "2025-08-22", "2025-08-25", "2025-08-26", "2025-08-27", "2025-08-28", "2025-08-29", "2025-09-01", "2025-09-02", "2025-09-03", "2025-09-04", "2025-09-05", "2025-09-08", "2025-09-09", "2025-09-10", "2025-09-11", "2025-09-12", "2025-09-15", "2025-09-16", "2025-09-17", "2025-09-18", "2025-09-19", "2025-09-22", "2025-09-23", "2025-09-24", "2025-09-25", "2025-09-26", "2025-09-29", "2025-09-30", "2025-10-01", "2025-10-02", "2025-10-10", "2025-10-13", "2025-10-14", "2025-10-15", "2025-10-16", "2025-10-17", "2025-10-20", "2025-10-21", "2025-10-22", "2025-10-23", "2025-10-24", "2025-10-27", "2025-10-28", "2025-10-29", "2025-10-30", "2025-10-31", "2025-11-03", "2025-11-04", "2025-11-05", "2025-11-06", "2025-11-07", "2025-11-10", "2025-11-11", "2025-11-12", "2025-11-13", "2025-11-14", "2025-11-17", "2025-11-18", "2025-11-19", "2025-11-20", "2025-11-21", "2025-11-24", "2025-11-25", "2025-11-26", "2025-11-27", "2025-11-28", "2025-12-01", "2025-12-02", "2025-12-03", "2025-12-04", "2025-12-05", "2025-12-08", "2025-12-09", "2025-12-10", "2025-12-11", "2025-12-12", "2025-12-15", "2025-12-16", "2025-12-17", "2025-12-18", "2025-12-19", "2025-12-22", "2025-12-23", "2025-12-24", "2025-12-26", "2025-12-29", "2025-12-30"], "prices": [41750, 41600, 44200, 43600, 43650, 38750, 39150, 39150, 42000, 42850, 41900, 40350, 39100, 39100, 38900, 39000, 36300, 36850, 38500, 37650, 41500, 41300, 41000, 40150, 50200, 50000, 50900, 51400, 54300, 41200, 39100, 37000, 38550, 40000, 40600, 43550, 42800, 41500, 42300, 41000, 42100, 44100, 43600, 46500, 45500, 45450, 44550, 48250, 50900, 53200, 51600, 51200, 56900, 57000, 57100, 62600, 60400, 66700, 62900, 65000, 67400, 71700, 71100, 83300, 80400, 70200, 68700, 69000, 67300, 70300, 70000, 71000, 72100, 68000, 69600, 67400, 73700, 69500, 75700, 75400, 79800, 77200, 74700, 74700, 72400, 71900, 72200, 68300, 65900, 69700, 72700, 72800, 79800, 76600, 80500, 86500, 90700, 92300, 96000, 94800, 97800, 89500, 90500, 91700, 90000, 92000, 93000, 95500, 98300, 100200, 96100, 94800, 96400, 104000, 100300, 99100, 98800, 101900, 110400, 117000], "volumes": [104389, 81008, 146608, 72045, 85341, 315043, 131310, 107550, 244699, 125330, 95507, 96197, 201024, 152157, 56806, 75408, 289250, 78298, 115409, 96957, 187220, 75952, 65168, 49264, 807622, 171233, 281138, 139353, 345900, 718018, 589875, 279366, 250292, 294700, 174643, 338734, 132437, 100717, 89546, 93135, 127984, 166005, 126787, 249534, 118426, 76521, 112867, 578341, 211590, 262267, 148597, 119626, 414052, 182037, 423429, 695502, 288034, 905146, 337809, 156873, 175936, 376444, 178507, 310140, 228106, 746825, 483690, 362983, 208704, 343760, 127040, 104275, 239653, 288086, 280537, 310014, 402399, 318667, 451526, 254627, 358889, 320614, 327110, 268058, 204061, 151321, 147116, 239572, 324913, 243718, 289579, 175732, 486657, 244529, 437829, 425487, 303489, 268720, 234313, 216032, 165775, 380837, 193951, 151761, 122968, 160165, 79126, 113789, 165120, 156466, 202425, 185434, 144040, 335710, 221748, 128585, 157702, 206033, 274261, 179884], "highs": [42500, 43600, 44400, 44250, 44750, 44200, 39700, 39950, 43700, 43350, 43000, 41900, 40150, 41300, 39600, 39900, 38250, 37700, 39900, 38050, 42200, 42000, 42500, 41100, 51200, 51000, 53800, 52100, 56300, 44450, 40750, 39100, 40100, 41600, 41800, 43750, 44000, 42750, 42650, 42700, 42950, 44750, 44600, 47900, 47400, 46600, 45350, 54800, 51800, 55200, 54600, 53000, 59300, 58000, 59500, 65000, 63000, 71500, 65500, 66000, 68100, 73600, 74000, 84100, 82100, 81500, 72000, 71400, 71300, 75100, 72100, 71900, 75000, 73800, 71000, 71000, 73900, 73500, 77700, 76600, 81700, 82000, 80200, 77100, 77000, 74000, 73600, 72800, 71900, 71600, 73900, 73300, 83100, 78900, 85300, 88400, 91700, 94200, 96500, 97100, 98200, 97100, 91100, 92500, 92900, 94100, 93600, 96000, 100400, 102400, 101300, 96700, 96900, 109000, 104600, 101000, 102000, 102900, 111300, 117600], "lows": [39600, 41300, 41650, 43150, 43200, 38150, 37950, 37750, 39000, 41200, 40700, 40150, 37800, 38500, 38550, 38350, 35350, 36500, 37400, 36600, 38000, 40800, 40600, 40100, 41700, 48650, 49950, 50000, 49350, 40000, 39050, 36750, 38150, 39400, 40100, 39450, 42250, 40800, 41350, 40650, 40550, 41700, 42550, 42950, 44850, 45200, 43750, 47950, 48550, 51200, 51300, 50400, 53300, 55900, 54100, 56200, 59600, 61100, 61800, 61700, 64200, 66400, 70700, 71600, 79000, 69400, 65600, 66800, 66600, 68400, 68800, 69150, 70400, 67100, 66500, 64800, 65800, 68300, 68700, 73100, 73500, 74200, 74500, 71500, 71800, 70200, 70400, 68300, 65300, 67800, 69300, 68400, 72300, 75600, 77500, 80700, 83900, 88000, 89000, 93500, 92800, 88800, 85800, 87500, 88500, 89100, 91100, 92200, 95500, 97100, 96000, 92800, 92100, 95600, 98800, 97500, 98200, 96800, 105000, 109900]}, "402340": {"dates": ["2025-07-07", "2025-07-08", "2025-07-09", "2025-07-10", "2025-07-11", "2025-07-14", "2025-07-15", "2025-07-16", "2025-07-17", "2025-07-18", "2025-07-21", "2025-07-22", "2025-07-23", "2025-07-24", "2025-07-25", "2025-07-28", "2025-07-29", "2025-07-30", "2025-07-31", "2025-08-01", "2025-08-04", "2025-08-05", "2025-08-06", "2025-08-07", "2025-08-08", "2025-08-11", "2025-08-12", "2025-08-13", "2025-08-14", "2025-08-18", "2025-08-19", "2025-08-20", "2025-08-21", "2025-08-22", "2025-08-25", "2025-08-26", "2025-08-27", "2025-08-28", "2025-08-29", "2025-09-01", "2025-09-02", "2025-09-03", "2025-09-04", "2025-09-05", "2025-09-08", "2025-09-09", "2025-09-10", "2025-09-11", "2025-09-12", "2025-09-15", "2025-09-16", "2025-09-17", "2025-09-18", "2025-09-19", "2025-09-22", "2025-09-23", "2025-09-24", "2025-09-25", "2025-09-26", "2025-09-29", "2025-09-30", "2025-10-01", "2025-10-02", "2025-10-10", "2025-10-13", "2025-10-14", "2025-10-15", "2025-10-16", "2025-10-17", "2025-10-20", "2025-10-21", "2025-10-22", "2025-10-23", "2025-10-24", "2025-10-27", "2025-10-28", "2025-10-29", "2025-10-30", "2025-10-31", "2025-11-03", "2025-11-04", "2025-11-05", "2025-11-06", "2025-11-07", "2025-11-10", "2025-11-11", "2025-11-12", "2025-11-13", "2025-11-14", "2025-11-17", "2025-11-18", "2025-11-19", "2025-11-20", "2025-11-21", "2025-11-24", "2025-11-25", "2025-11-26", "2025-11-27", "2025-11-28", "2025-12-01", "2025-12-02", "2025-12-03", "2025-12-04", "2025-12-05", "2025-12-08", "2025-12-09", "2025-12-10", "2025-12-11", "2025-12-12", "2025-12-15", "2025-12-16", "2025-12-17", "2025-12-18", "2025-12-19", "2025-12-22", "2025-12-23", "2025-12-24", "2025-12-26", "2025-12-29", "2025-12-30"], "prices": [162000, 172900, 181200, 183600, 174000, 178300, 173000, 174100, 158900, 160500, 161400, 156800, 156000, 152000, 153000, 150200, 149200, 148000, 152100, 140300, 140200, 143500, 140300, 141900, 139300, 142000, 141500, 144600, 143700, 137600, 140400, 137100, 135200, 135200, 144800, 141200, 139900, 149600, 149000, 145000, 143600, 143900, 149400, 152800, 153600, 162000, 174300, 182100, 197300, 200500, 206000, 200500, 208500, 216500, 215500, 220000, 217500, 211000, 195300, 197100, 201500, 205500, 238000, 247000, 245500, 234500, 243500, 257500, 257500, 262000, 256000, 258500, 253000, 271000, 291500, 272000, 275000, 281000, 260000, 282500, 274000, 260000, 270000, 279000, 290000, 311500, 322500, 323500, 291000, 304500, 283500, 283000, 293500, 266000, 276000, 290500, 291000, 301000, 298000, 302000, 308500, 310500, 312500, 302000, 322000, 323000, 324000, 307500, 308000, 292500, 281000, 283000, 290500, 290500, 315000, 315000, 321000, 334500, 346000, 368000], "volumes": [357800, 1238643, 559727, 418896, 3230160, 336773, 473753, 362771, 933933, 502251, 385203, 373178, 460621, 534864, 315465, 337594, 277930, 324197, 469088, 525224, 447622, 308156, 307025, 324029, 380463, 312233, 369609, 349821, 320084, 365978, 392054, 785076, 457243, 205651, 448583, 524797, 234561, 786806, 427314, 227876, 188841, 211578, 311683, 350950, 190095, 668427, 948822, 672306, 820778, 548068, 594560, 719626, 591173, 733301, 454188, 434395, 594973, 595712, 823131, 403243, 409786, 284452, 1434172, 1339989, 666623, 461033, 373309, 632288, 560679, 404341, 542748, 406816, 521837, 524517, 611042, 491298, 600207, 569613, 820516, 950548, 520765, 852937, 652957, 546490, 544410, 1187646, 752525, 551413, 595985, 498174, 721593, 597490, 673727, 654899, 1074605, 710228, 536219, 485209, 389771, 423148, 504155, 288129, 437651, 384010, 517651, 456838, 439546, 321042, 203829, 469687, 331849, 448891, 339592, 320036, 351419, 240036, 215171, 458435, 370258, 557353], "highs": [163200, 174000, 181500, 183600, 189900, 181300, 175900, 175600, 171900, 161900, 162400, 162600, 157300, 160500, 154300, 155600, 149800, 149600, 154300, 149500, 141700, 146400, 143400, 141900, 143100, 142900, 147200, 146200, 146000, 142300, 141200, 141300, 137300, 137800, 146300, 143400, 143400, 153000, 153700, 149000, 145900, 145500, 151600, 155000, 154800, 163400, 175200, 182100, 200000, 201000, 210500, 207000, 210000, 216500, 218000, 224000, 225000, 214500, 208000, 199500, 204000, 207500, 248500, 255000, 249000, 253500, 246000, 259500, 267000, 263500, 268500, 259000, 258500, 274000, 295000, 285000, 282000, 297500, 283500, 285500, 282500, 267000, 279000, 282000, 302500, 327000, 324500, 324000, 304500, 313000, 298500, 286500, 311000, 276500, 284000, 305000, 295000, 306000, 305500, 310000, 313000, 317500, 312500, 309000, 322500, 330000, 333000, 324000, 317000, 300000, 293500, 289500, 296000, 300000, 318000, 320000, 323000, 348000, 350000, 370000], "lows": [156800, 162500, 169100, 177100, 173700, 175100, 170700, 171700, 155700, 157500, 158700, 155500, 152600, 151300, 150400, 148700, 145400, 146500, 146300, 140100, 138200, 141800, 137200, 136100, 138200, 138200, 140700, 142100, 142700, 136700, 137700, 130900, 131500, 133800, 138300, 140000, 137600, 138100, 148900, 142800, 143600, 141500, 144000, 151400, 151400, 154500, 166500, 176000, 185700, 191200, 197300, 199500, 197100, 207500, 209500, 216000, 212000, 205500, 194900, 195300, 196000, 201000, 217500, 240500, 235000, 229500, 236500, 238500, 250500, 250000, 250500, 251000, 242500, 257000, 282500, 270000, 266500, 269000, 251500, 250000, 265500, 241000, 250000, 261000, 279000, 307000, 308500, 312000, 289500, 295500, 281500, 269750, 292500, 263500, 265500, 289000, 285000, 295500, 295000, 298000, 301000, 298500, 293000, 295000, 299000, 320000, 318000, 307500, 304000, 273500, 281000, 280000, 273500, 290500, 300500, 313500, 312500, 330000, 340500, 340000]}};
+
+        Object.keys(chartData).forEach(ticker => {
+            const data = chartData[ticker];
+            const ctx = document.getElementById('chart-' + ticker);
+
+            if (ctx) {
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: data.dates,
+                        datasets: [{
+                            label: '종가',
+                            data: data.prices,
+                            borderColor: '#667eea',
+                            backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.1,
+                            yAxisID: 'y',
+                        }, {
+                            label: '거래량',
+                            data: data.volumes,
+                            type: 'bar',
+                            backgroundColor: 'rgba(118, 75, 162, 0.3)',
+                            yAxisID: 'y1',
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false,
+                        },
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.parsed.y !== null) {
+                                            if (context.dataset.label === '종가') {
+                                                label += context.parsed.y.toLocaleString() + '원';
+                                            } else {
+                                                label += context.parsed.y.toLocaleString();
+                                            }
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                type: 'linear',
+                                display: true,
+                                position: 'left',
+                                title: {
+                                    display: true,
+                                    text: '가격 (원)'
+                                }
+                            },
+                            y1: {
+                                type: 'linear',
+                                display: true,
+                                position: 'right',
+                                title: {
+                                    display: true,
+                                    text: '거래량'
+                                },
+                                grid: {
+                                    drawOnChartArea: false,
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>
