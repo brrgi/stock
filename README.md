@@ -17,7 +17,7 @@ pip install -r requirements.txt
 ## 사용법
 
 ```bash
-python main.py
+python src/main.py
 ```
 
 ## 대시보드 (로컬)
@@ -27,10 +27,10 @@ python main.py
 pip install -r requirements.txt
 
 # 주간 데이터 생성 (최근 26주 + 오늘)
-python generate_weekly_data.py --weeks 26
+python src/generate_weekly_data.py --weeks 26
 
 # 인터랙티브 대시보드 생성
-python create_interactive_dashboard.py
+python src/create_interactive_dashboard.py
 
 # 로컬 서버 실행
 python -m http.server 8001 --bind 127.0.0.1
@@ -39,7 +39,7 @@ python -m http.server 8001 --bind 127.0.0.1
 브라우저에서 아래 주소를 열면 됩니다.
 
 ```
-http://127.0.0.1:8001/dashboard_interactive.html
+http://127.0.0.1:8001/web/dashboard_interactive.html
 ```
 
 ## 노트북에서 동일하게 사용하기
@@ -50,8 +50,8 @@ http://127.0.0.1:8001/dashboard_interactive.html
 git clone <REPO_URL>
 cd stock-rs-screener
 pip install -r requirements.txt
-python generate_weekly_data.py --weeks 26
-python create_interactive_dashboard.py
+python src/generate_weekly_data.py --weeks 26
+python src/create_interactive_dashboard.py
 python -m http.server 8001 --bind 127.0.0.1
 ```
 
@@ -64,10 +64,10 @@ python -m http.server 8001 --bind 127.0.0.1
 
 ```
 stock-rs-screener/
-├── main.py                 # 메인 실행 파일
-├── data_collector.py       # 주식 데이터 수집
-├── rs_calculator.py        # RS Rating 계산
-├── screener.py            # 주도주 스크리닝
+├── src/                   # 파이썬 모듈/스크립트
+├── scripts/               # 실행용 배치 파일
+├── data/                  # 데이터/캐시
+├── web/                   # 생성된 대시보드 및 정적 파일
 ├── requirements.txt       # 필요 패키지
-└── results/              # 결과 저장 폴더
+└── results/               # 결과 저장 폴더
 ```
