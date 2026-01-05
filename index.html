@@ -1,0 +1,1584 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>진입신호 백테스트 - 날짜별 조회</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="vendor/chartjs-chart-financial.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+    <script src="vendor/chartjs-plugin-zoom.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0a0e27;
+            color: #d1d4dc;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container { display: flex; height: 100vh; }
+
+        /* 왼쪽 패널 */
+        .left-panel {
+            width: 350px;
+            background: #131722;
+            border-right: 1px solid #2a2e39;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .header h1 { font-size: 1.3em; margin-bottom: 10px; color: white; }
+        .header .subtitle { font-size: 0.85em; opacity: 0.9; color: white; }
+
+        /* 날짜 선택 */
+        .date-selector {
+            padding: 15px 20px;
+            background: #1e222d;
+            border-bottom: 1px solid #2a2e39;
+            position: sticky;
+            top: 0;
+            z-index: 9;
+        }
+
+        .date-selector label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+            color: #848e9c;
+        }
+
+        .date-selector select {
+            width: 100%;
+            padding: 10px;
+            background: #2b2f3a;
+            border: 1px solid #3a3e4a;
+            border-radius: 6px;
+            color: #d1d4dc;
+            font-size: 0.95em;
+            cursor: pointer;
+        }
+
+        .date-selector select:hover {
+            border-color: #667eea;
+        }
+
+        .filters {
+            padding: 15px 20px;
+            background: #131722;
+            border-bottom: 1px solid #2a2e39;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .filter-row label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.85em;
+            color: #848e9c;
+        }
+
+        .filter-row select,
+        .filter-row input {
+            width: 100%;
+            padding: 8px 10px;
+            background: #2b2f3a;
+            border: 1px solid #3a3e4a;
+            border-radius: 6px;
+            color: #d1d4dc;
+            font-size: 0.9em;
+        }
+
+        .range-inputs {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .range-inputs input {
+            width: 100%;
+        }
+
+        .range-sep {
+            color: #848e9c;
+            font-size: 0.85em;
+        }
+
+        @media (max-width: 480px) {
+            .header {
+                padding: 6px 8px;
+            }
+
+            .header h1 { font-size: 0.95em; margin-bottom: 4px; }
+            .header .subtitle { font-size: 0.7em; }
+
+            .date-selector {
+                padding: 6px 8px;
+            }
+
+            .date-selector label {
+                margin-bottom: 4px;
+                font-size: 0.72em;
+            }
+
+            .date-selector select {
+                padding: 6px 8px;
+                font-size: 0.78em;
+            }
+
+            .filters {
+                padding: 6px 8px;
+                gap: 4px;
+            }
+
+            .filter-row label {
+                margin-bottom: 3px;
+                font-size: 0.72em;
+            }
+
+            .filter-row select,
+            .filter-row input {
+                padding: 5px 8px;
+                font-size: 0.76em;
+            }
+
+            .range-sep {
+                font-size: 0.72em;
+            }
+        }
+
+        @media (max-width: 380px) {
+            .header { padding: 5px 6px; }
+            .header h1 { font-size: 0.88em; }
+            .header .subtitle { font-size: 0.66em; }
+            .date-selector { padding: 5px 6px; }
+            .date-selector select { padding: 5px 6px; font-size: 0.74em; }
+            .filters { padding: 5px 6px; gap: 3px; }
+            .filter-row select,
+            .filter-row input { padding: 4px 6px; font-size: 0.72em; }
+        }
+
+        /* 로딩 표시 */
+        .loading {
+            padding: 20px;
+            text-align: center;
+            color: #848e9c;
+        }
+
+        .loading:after {
+            content: '...';
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: ''; }
+            40% { content: '.'; }
+            60% { content: '..'; }
+            80%, 100% { content: '...'; }
+        }
+
+        /* 종목 리스트 */
+        .stock-list {
+            flex: 1;
+            overflow-y: auto;
+            scrollbar-width: none;
+            scrollbar-color: transparent transparent;
+        }
+
+        .stock-list.show-scrollbar {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(148, 163, 184, 0.45) transparent;
+        }
+
+        .stock-list::-webkit-scrollbar {
+            width: 0;
+            height: 0;
+        }
+
+        .stock-list.show-scrollbar::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .stock-list.show-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.45);
+            border-radius: 999px;
+            border: 2px solid transparent;
+            background-clip: padding-box;
+        }
+
+        .stock-list.show-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .stock-item {
+            padding: 15px 20px;
+            border-bottom: 1px solid #2a2e39;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .stock-item:hover {
+            background: #1e222d;
+            border-left: 3px solid #667eea;
+        }
+
+        .stock-item.active {
+            background: #2b2f3a;
+            border-left: 3px solid #667eea;
+        }
+
+        .stock-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .stock-name {
+            font-size: 1.05em;
+            font-weight: 600;
+            color: #e8eaed;
+        }
+
+        .stock-code {
+            font-size: 0.85em;
+            color: #848e9c;
+        }
+
+        .rs-badge {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .stock-signals {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .signal-badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: 500;
+        }
+
+        .signal-badge.ryan {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4caf50;
+            border: 1px solid #4caf50;
+        }
+
+        .signal-badge.minervini {
+            background: rgba(33, 150, 243, 0.2);
+            color: #2196f3;
+            border: 1px solid #2196f3;
+        }
+
+        /* 오른쪽 패널 */
+        .right-panel {
+            flex: 1;
+            background: #0a0e27;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 24px;
+        }
+
+        #detail-content {
+            min-height: 100%;
+        }
+
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: calc(100vh - 48px);
+            color: #848e9c;
+            text-align: center;
+        }
+
+        .empty-state h2 { margin-bottom: 10px; }
+        .empty-state p { font-size: 0.95em; }
+
+        .detail-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 25px;
+            color: white;
+            border-radius: 12px;
+        }
+
+        .detail-title { font-size: 1.5em; margin-bottom: 15px; }
+
+        .detail-meta {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+
+        .external-links {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .external-link {
+            display: inline-flex;
+            align-items: center;
+            padding: 8px 14px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.12);
+            color: #fff;
+            text-decoration: none;
+            font-size: 0.85em;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+        }
+
+        .external-link:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .meta-item {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        .meta-value {
+            font-weight: 600;
+            margin-left: 5px;
+        }
+
+        .chart-container {
+            padding: 20px;
+            background: #131722;
+            margin: 20px 0;
+            border-radius: 10px;
+            height: 520px;
+        }
+
+        .chart-empty {
+            display: none;
+            height: 100%;
+            align-items: center;
+            justify-content: center;
+            color: #848e9c;
+            font-size: 0.95em;
+        }
+
+        .detail-wrap {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding-bottom: 40px;
+        }
+
+        .price-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 12px;
+            margin: 0 0 20px;
+        }
+
+        .price-card {
+            background: #131722;
+            border-radius: 10px;
+            padding: 14px;
+            border: 1px solid #1e222d;
+            text-align: center;
+        }
+
+        .price-label {
+            font-size: 0.8em;
+            color: #848e9c;
+            margin-bottom: 8px;
+        }
+
+        .price-value {
+            font-size: 1.05em;
+            font-weight: 600;
+            color: #e8eaed;
+        }
+
+        .price-value.entry {
+            color: #4caf50;
+        }
+
+        .price-value.stop {
+            color: #f44336;
+        }
+
+        .analysis-section {
+            padding: 20px;
+            margin: 20px 0;
+            background: #131722;
+            border-radius: 10px;
+        }
+
+        .analysis-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+        }
+
+        .analysis-box {
+            background: #0f1424;
+            border: 1px solid #1e222d;
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        .analysis-box-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            font-size: 1em;
+            color: #e8eaed;
+        }
+
+        .score-badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 600;
+            background: rgba(102, 126, 234, 0.2);
+            color: #c8d0ff;
+        }
+
+        .check-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            background: #131722;
+            border: 1px solid #1e222d;
+        }
+
+        .check-item.pass {
+            border-left: 3px solid #4caf50;
+        }
+
+        .check-item.fail {
+            border-left: 3px solid #f44336;
+        }
+
+        .check-line {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .check-icon {
+            width: 18px;
+            text-align: center;
+            font-weight: 700;
+            font-size: 0.9em;
+        }
+
+        .check-icon.pass {
+            color: #4caf50;
+        }
+
+        .check-icon.fail {
+            color: #f44336;
+        }
+
+        .check-label {
+            font-size: 0.9em;
+            color: #e8eaed;
+        }
+
+        .check-desc {
+            font-size: 0.8em;
+            color: #848e9c;
+        }
+
+        .analysis-title {
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            color: #e8eaed;
+        }
+
+        .criteria-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .criteria-item {
+            padding: 12px;
+            background: #1e222d;
+            border-radius: 8px;
+            border-left: 3px solid #3a3e4a;
+        }
+
+        .criteria-item.pass { border-left-color: #4caf50; }
+        .criteria-item.fail { border-left-color: #f44336; }
+
+        .criteria-label {
+            font-size: 0.85em;
+            color: #848e9c;
+            margin-bottom: 4px;
+        }
+
+        .criteria-value {
+            font-size: 1em;
+            font-weight: 600;
+        }
+
+        .criteria-value.pass { color: #4caf50; }
+        .criteria-value.fail { color: #f44336; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 왼쪽 패널 -->
+        <div class="left-panel">
+            <div class="header">
+                <h1>David Ryan 진입 신호</h1>
+                <div class="subtitle">날짜별 백테스트 결과</div>
+            </div>
+
+            <!-- 날짜 선택 -->
+            <div class="date-selector">
+                <label for="dateSelect">분석 날짜 선택</label>
+                <select id="dateSelect" onchange="loadDateData(this.value)">
+                    <option value="2026-01-04">2026-01-04</option>
+<option value="2026-01-03">2026-01-03</option>
+<option value="2026-01-01">2026-01-01</option>
+<option value="2025-12-26">2025-12-26</option>
+<option value="2025-12-19">2025-12-19</option>
+<option value="2025-12-12">2025-12-12</option>
+<option value="2025-12-05">2025-12-05</option>
+<option value="2025-11-28">2025-11-28</option>
+<option value="2025-11-21">2025-11-21</option>
+<option value="2025-11-14">2025-11-14</option>
+<option value="2025-11-07">2025-11-07</option>
+<option value="2025-10-31">2025-10-31</option>
+<option value="2025-10-24">2025-10-24</option>
+<option value="2025-10-17">2025-10-17</option>
+<option value="2025-10-10">2025-10-10</option>
+<option value="2025-10-03">2025-10-03</option>
+<option value="2025-09-26">2025-09-26</option>
+<option value="2025-09-19">2025-09-19</option>
+<option value="2025-09-12">2025-09-12</option>
+<option value="2025-09-05">2025-09-05</option>
+<option value="2025-08-29">2025-08-29</option>
+<option value="2025-08-22">2025-08-22</option>
+<option value="2025-08-15">2025-08-15</option>
+<option value="2025-08-08">2025-08-08</option>
+<option value="2025-08-01">2025-08-01</option>
+<option value="2025-07-25">2025-07-25</option>
+<option value="2025-07-18">2025-07-18</option>
+<option value="2025-07-11">2025-07-11</option>
+<option value="2025-07-04">2025-07-04</option>
+<option value="2025-06-06">2025-06-06</option>
+                </select>
+            </div>
+
+            <div class="filters">
+                <div class="filter-row">
+                    <label for="signalFilter">신호 필터</label>
+                    <select id="signalFilter">
+                        <option value="any">전체</option>
+                        <option value="ryan">Ryan만</option>
+                        <option value="minervini">Minervini만</option>
+                        <option value="both">둘 다</option>
+                    </select>
+                </div>
+                <div class="filter-row">
+                    <label>RS 범위</label>
+                    <div class="range-inputs">
+                        <input id="rsMin" type="number" inputmode="numeric" placeholder="최소" />
+                        <span class="range-sep">~</span>
+                        <input id="rsMax" type="number" inputmode="numeric" placeholder="최대" />
+                    </div>
+                </div>
+                <div class="filter-row">
+                    <label for="sortBy">정렬</label>
+                    <select id="sortBy">
+                        <option value="rs-desc">RS 높은 순</option>
+                        <option value="signal-desc">신호강도 높은 순</option>
+                        <option value="name-asc">종목명 가나다</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="stockList" class="stock-list">
+                <div class="loading">데이터 로딩 중</div>
+            </div>
+        </div>
+
+        <!-- 오른쪽 패널 -->
+        <div class="right-panel">
+            <div id="detail-content" class="empty-state">
+                <h2>종목을 선택하세요</h2>
+                <p>왼쪽 목록에서 종목을 클릭하면 상세 분석을 볼 수 있습니다</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentData = null;
+        let currentChart = null;
+        let availableDates = [];
+        let latestPrices = {};
+        let latestLoaded = false;
+        let filteredTickers = [];
+        let activeIndex = -1;
+        let stockListScrollTimer = null;
+
+        // 페이지 로드 시 날짜 목록 및 첫 데이터 로드
+        window.addEventListener('DOMContentLoaded', () => {
+            setupFilters();
+            setupKeyboardNavigation();
+            loadAvailableDates().then(() => {
+                const select = document.getElementById('dateSelect');
+                const preferred = getPreferredDate();
+                if (preferred) {
+                    select.value = preferred;
+                    loadDateData(preferred);
+                } else if (select.options.length > 0) {
+                    loadDateData(select.value);
+                }
+            });
+        });
+
+        function ensureFinancialRegistered() {
+            if (!window.Chart || !Chart.register) return false;
+            const candidate = window.ChartFinancial
+                || window.chartjsChartFinancial
+                || window['chartjs-chart-financial']
+                || window.ChartFinance;
+            if (candidate) {
+                const items = [
+                    candidate.CandlestickController,
+                    candidate.OhlcController,
+                    candidate.CandlestickElement,
+                    candidate.OhlcElement,
+                    candidate.FinancialScale
+                ].filter(Boolean);
+                if (items.length > 0) {
+                    Chart.register(...items);
+                }
+            }
+            try {
+                return !!(Chart?.controllers?.candlestick || Chart?.registry?.getController?.('candlestick'));
+            } catch (e) {
+                return false;
+            }
+        }
+
+        function ensureZoomRegistered() {
+            if (!window.Chart || !Chart.register) return false;
+            const zoomPlugin = window.ChartZoom
+                || window.chartjsPluginZoom
+                || window.chartjsZoom
+                || window.ZoomPlugin;
+            if (zoomPlugin) {
+                Chart.register(zoomPlugin);
+                return true;
+            }
+            return false;
+        }
+
+        function registerCrosshairPlugin() {
+            if (!window.Chart || !Chart.register) return;
+            const crosshairPlugin = {
+                id: 'crosshairLine',
+                afterDraw(chart) {
+                    const active = chart.tooltip?.getActiveElements?.() || chart.tooltip?._active;
+                    if (!active || active.length === 0) return;
+                    const x = active[0].element.x;
+                    const ctx = chart.ctx;
+                    const top = chart.chartArea.top;
+                    const bottom = chart.chartArea.bottom;
+                    ctx.save();
+                    ctx.strokeStyle = 'rgba(148, 163, 184, 0.6)';
+                    ctx.setLineDash([4, 4]);
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(x, top);
+                    ctx.lineTo(x, bottom);
+                    ctx.stroke();
+                    ctx.restore();
+                }
+            };
+            Chart.register(crosshairPlugin);
+        }
+
+        function enableDragPan(chart, maxIndex) {
+            const canvas = chart.canvas;
+            let isDragging = false;
+            let startX = 0;
+            let startMin = 0;
+            let startMax = 0;
+
+            const clamp = (val, min, max) => Math.max(min, Math.min(max, val));
+            const getScale = () => chart.scales.x;
+
+            const onDown = (event) => {
+                if (event.button !== 0) return;
+                const scale = getScale();
+                isDragging = true;
+                startX = event.clientX;
+                startMin = Number.isFinite(scale.min) ? scale.min : 0;
+                startMax = Number.isFinite(scale.max) ? scale.max : maxIndex;
+                canvas.style.cursor = 'grabbing';
+            };
+
+            const onMove = (event) => {
+                if (!isDragging) return;
+                const scale = getScale();
+                const area = chart.chartArea;
+                const range = (startMax - startMin) || 1;
+                const width = Math.max(1, area.right - area.left);
+                const deltaPx = event.clientX - startX;
+                const deltaValue = (deltaPx / width) * range;
+
+                let newMin = startMin - deltaValue;
+                let newMax = startMax - deltaValue;
+                if (newMin < 0) {
+                    newMax -= newMin;
+                    newMin = 0;
+                }
+                if (newMax > maxIndex) {
+                    const over = newMax - maxIndex;
+                    newMin = clamp(newMin - over, 0, maxIndex);
+                    newMax = maxIndex;
+                }
+
+                chart.options.scales.x.min = newMin;
+                chart.options.scales.x.max = newMax;
+                chart.update('none');
+            };
+
+            const onUp = () => {
+                if (!isDragging) return;
+                isDragging = false;
+                canvas.style.cursor = 'default';
+            };
+
+            canvas.addEventListener('mousedown', onDown);
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('mouseup', onUp);
+        }
+
+        function setupFilters() {
+            const controls = ['signalFilter', 'rsMin', 'rsMax', 'sortBy'];
+            controls.forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.addEventListener('change', renderStockList);
+                el.addEventListener('input', renderStockList);
+            });
+        }
+
+        function getLocalDateString() {
+            return new Date().toLocaleDateString('sv-SE');
+        }
+
+        async function loadAvailableDates() {
+            const select = document.getElementById('dateSelect');
+            const existing = Array.from(select.options).map(opt => opt.value).filter(Boolean);
+            let dates = [];
+            const candidates = ['../data/weekly_data/index.json', '../data/weekly_data/manifest.json'];
+
+            for (const path of candidates) {
+                try {
+                    const response = await fetch(path);
+                    if (!response.ok) continue;
+                    const data = await response.json();
+                    if (Array.isArray(data)) {
+                        dates = data;
+                    } else if (Array.isArray(data?.dates)) {
+                        dates = data.dates;
+                    }
+                    if (dates.length > 0) break;
+                } catch (error) {
+                    // ignore and fall back to existing options
+                }
+            }
+
+            if (dates.length === 0) {
+                dates = existing;
+            }
+
+            if (dates.length === 0) return;
+
+            if (typeof dates[0] === 'string') {
+                availableDates = dates.map(date => ({ date, signals: null }));
+            } else {
+                availableDates = dates
+                    .filter(item => item && item.date)
+                    .map(item => ({ date: item.date, signals: Number(item.signals ?? item.count ?? 0) }));
+            }
+
+            const todayStr = getLocalDateString();
+            availableDates = availableDates.filter(item => String(item.date) <= todayStr);
+            if (!availableDates.some(item => item.date === todayStr)) {
+                availableDates.push({ date: todayStr, signals: 0, isToday: true });
+            }
+            availableDates.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+            select.innerHTML = '';
+            availableDates.forEach(item => {
+                const date = item.date;
+                const label = item.isToday
+                    ? `${date} (오늘)`
+                    : (item.signals === null ? date : `${date} (${item.signals})`);
+                const option = document.createElement('option');
+                option.value = date;
+                option.textContent = label;
+                select.appendChild(option);
+            });
+        }
+
+        async function loadLatestPrices() {
+            if (latestLoaded) return;
+            try {
+                const response = await fetch('../data/weekly_data/latest_prices.json');
+                if (response.ok) {
+                    latestPrices = await response.json();
+                }
+            } catch (error) {
+                latestPrices = {};
+            } finally {
+                latestLoaded = true;
+            }
+        }
+
+        function getPreferredDate() {
+            if (!availableDates || availableDates.length === 0) return null;
+            const withSignals = availableDates.find(item => (item.signals ?? 0) > 0);
+            return (withSignals ? withSignals.date : availableDates[0].date);
+        }
+
+        // 날짜 데이터 로드
+        async function loadDateData(date, fallbackAttempted = false) {
+            const stockList = document.getElementById('stockList');
+            stockList.innerHTML = '<div class="loading">데이터 로딩 중</div>';
+
+            try {
+                await loadLatestPrices();
+                const response = await fetch(`../data/weekly_data/signals_${date}.json`);
+                if (!response.ok) throw new Error('데이터 로드 실패');
+
+                const text = await response.text();
+                const sanitized = text.replace(/\bNaN\b/g, 'null');
+                currentData = JSON.parse(sanitized);
+                console.log('로드된 데이터:', currentData);
+
+                renderStockList();
+            } catch (error) {
+                console.error('데이터 로드 오류:', error);
+                const todayStr = getLocalDateString();
+                if (!fallbackAttempted && date === todayStr) {
+                    const fallback = availableDates.find(item => item.date !== todayStr);
+                    if (fallback) {
+                        const select = document.getElementById('dateSelect');
+                        if (select) {
+                            select.value = fallback.date;
+                        }
+                        stockList.innerHTML = '<div class="loading">오늘 데이터가 없어 최신 거래일로 표시합니다</div>';
+                        loadDateData(fallback.date, true);
+                        return;
+                    }
+                }
+                const protocol = window.location.protocol;
+                if (protocol === 'file:') {
+                    stockList.innerHTML = '<div class="loading">로컬 서버로 열어주세요 (http://localhost:8000)</div>';
+                } else {
+                    stockList.innerHTML = '<div class="loading">데이터 로드 실패</div>';
+                }
+            }
+        }
+
+        // 종목 리스트 렌더링
+        function renderStockList() {
+            const stockList = document.getElementById('stockList');
+
+            if (!currentData || !currentData.signals || currentData.signals.length === 0) {
+                stockList.innerHTML = '<div class="loading">진입신호가 없습니다 (다른 날짜를 선택하세요)</div>';
+                return;
+            }
+
+            const signalFilter = document.getElementById('signalFilter')?.value || 'any';
+            const rsMin = parseFloat(document.getElementById('rsMin')?.value);
+            const rsMax = parseFloat(document.getElementById('rsMax')?.value);
+            const sortBy = document.getElementById('sortBy')?.value || 'rs-desc';
+
+            const filtered = currentData.signals.filter(stock => {
+                const hasRyan = !!stock.Ryan_진입신호;
+                const hasMinervini = !!stock.미너비니_진입신호;
+                if (signalFilter === 'ryan' && !hasRyan) return false;
+                if (signalFilter === 'minervini' && !hasMinervini) return false;
+                if (signalFilter === 'both' && !(hasRyan && hasMinervini)) return false;
+
+                const rs = Number(stock.RS등급);
+                if (!Number.isNaN(rsMin) && rs < rsMin) return false;
+                if (!Number.isNaN(rsMax) && rs > rsMax) return false;
+
+                return true;
+            });
+
+            filtered.sort((a, b) => {
+                if (sortBy === 'name-asc') {
+                    return String(a.종목명).localeCompare(String(b.종목명), 'ko');
+                }
+                if (sortBy === 'signal-desc') {
+                    const aScore = Math.max(Number(a.Ryan_신호강도 || 0), Number(a.미너비니_신호강도 || 0));
+                    const bScore = Math.max(Number(b.Ryan_신호강도 || 0), Number(b.미너비니_신호강도 || 0));
+                    return bScore - aScore;
+                }
+                return Number(b.RS등급 || 0) - Number(a.RS등급 || 0);
+            });
+
+            let html = `<div class="loading">총 ${filtered.length}개 종목</div>`;
+            filtered.forEach(stock => {
+                const displayName = stock.종목명 && stock.종목명 !== stock.종목코드 ? stock.종목명 : stock.종목코드;
+                const signals = [];
+                if (stock.Ryan_진입신호) signals.push('<span class="signal-badge ryan">Ryan</span>');
+                if (stock.미너비니_진입신호) signals.push('<span class="signal-badge minervini">Minervini</span>');
+
+                html += `
+                    <div class="stock-item" onclick="showStock('${stock.종목코드}')" data-ticker="${stock.종목코드}">
+                        <div class="stock-item-header">
+                            <div>
+                                <div class="stock-name">${displayName}</div>
+                                <div class="stock-code">${stock.종목코드}</div>
+                            </div>
+                            <div class="rs-badge">RS ${stock.RS등급}</div>
+                        </div>
+                        <div class="stock-signals">${signals.join('')}</div>
+                    </div>
+                `;
+            });
+
+            stockList.innerHTML = html;
+            updateFilteredTickers();
+            setupStockListScrollbar();
+        }
+
+        // 종목 상세 표시
+        function showStock(ticker) {
+            const stock = currentData.signals.find(s => s.종목코드 === ticker);
+            if (!stock) return;
+
+            // 활성화 표시
+            document.querySelectorAll('.stock-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            document.querySelector(`[data-ticker="${ticker}"]`).classList.add('active');
+            updateActiveIndex(ticker);
+            scrollStockIntoView(ticker);
+
+            // 상세 화면 생성
+            const displayName = stock.종목명 && stock.종목명 !== stock.종목코드 ? stock.종목명 : stock.종목코드;
+            let html = `
+                <div class="detail-wrap">
+                <div class="detail-header">
+                    <div class="detail-title">${displayName}</div>
+                    <div class="detail-meta">
+                        <div class="meta-item">종목코드: <span class="meta-value">${stock.종목코드}</span></div>
+                        <div class="meta-item">RS 등급: <span class="meta-value">${stock.RS등급}</span></div>
+                        <div class="meta-item">현재가: <span class="meta-value">${stock.현재가?.toLocaleString()}원</span></div>
+                    </div>
+                    <div class="external-links">
+                        <a href="https://www.tradingview.com/chart/?symbol=KRX:${ticker}" target="_blank" class="external-link">
+                            TradingView에서 보기
+                        </a>
+                        <a href="https://finance.naver.com/item/main.naver?code=${ticker}" target="_blank" class="external-link">
+                            네이버 증권에서 보기
+                        </a>
+                    </div>
+                </div>
+            `;
+
+            // 차트
+            if (currentData.chart_data && currentData.chart_data[ticker]) {
+                html += `
+                    <div class="chart-container">
+                        <div id="chartMessage" class="chart-empty">차트 데이터를 표시할 수 없습니다.</div>
+                        <canvas id="priceChart" width="800" height="400"></canvas>
+                    </div>
+                `;
+            } else {
+                html += `
+                    <div class="chart-container">
+                        <div id="chartMessage" class="chart-empty" style="display:flex;">차트 데이터가 없습니다.</div>
+                    </div>
+                `;
+            }
+
+            html += `
+                <div class="price-grid">
+                    <div class="price-card">
+                        <div class="price-label">오늘 현재가</div>
+                        <div class="price-value">${latestPrices?.[ticker]?.toLocaleString?.() || '-' }원</div>
+                    </div>
+                    <div class="price-card">
+                        <div class="price-label">선택일 현재가</div>
+                        <div class="price-value">${stock.현재가?.toLocaleString()}원</div>
+                    </div>
+            `;
+
+            if (stock.Ryan_진입가) {
+                html += `
+                    <div class="price-card">
+                        <div class="price-label">Ryan 진입가</div>
+                        <div class="price-value entry">${stock.Ryan_진입가?.toLocaleString()}원</div>
+                    </div>
+                    <div class="price-card">
+                        <div class="price-label">Ryan 손절가</div>
+                        <div class="price-value stop">${stock.Ryan_손절가?.toLocaleString()}원</div>
+                    </div>
+                `;
+            }
+
+            if (stock.Ryan_추가매수1) {
+                html += `
+                    <div class="price-card">
+                        <div class="price-label">추가매수 1차</div>
+                        <div class="price-value entry">${stock.Ryan_추가매수1?.toLocaleString()}원</div>
+                    </div>
+                `;
+            }
+
+            if (stock.Ryan_손익비) {
+                html += `
+                    <div class="price-card">
+                        <div class="price-label">손익비</div>
+                        <div class="price-value">${stock.Ryan_손익비?.toFixed(2)}:1</div>
+                    </div>
+                `;
+            }
+
+            if (stock.미너비니_진입가) {
+                html += `
+                    <div class="price-card">
+                        <div class="price-label">Minervini 진입가</div>
+                        <div class="price-value entry">${stock.미너비니_진입가?.toLocaleString()}원</div>
+                    </div>
+                    <div class="price-card">
+                        <div class="price-label">Minervini 손절가</div>
+                        <div class="price-value stop">${stock.미너비니_손절가?.toLocaleString()}원</div>
+                    </div>
+                `;
+            }
+
+            html += '</div>';
+
+            const ryanChecks = stock.ryan_checks || {};
+            const tt = stock.trend_template || {};
+            const minChecks = stock.minervini_checks || {};
+            const ryanItems = [
+                { key: 'entry_signal', label: 'Ryan 진입 신호' },
+                { key: 'rs_check', label: 'RS Rating >= 90' },
+                { key: 'ma_alignment', label: '이동평균선 정배열' },
+                { key: 'year_position_check', label: '52주 포지션 양호' },
+                { key: 'vcp_detected', label: 'VCP 패턴' },
+                { key: 'vdu_detected', label: 'VDU (거래량 건조)' },
+                { key: 'pivot_breakout', label: '피벗 근접/돌파' },
+                { key: 'volume_surge', label: '거래량 증가/폭증' }
+            ];
+
+            const minItems = [
+                { key: 'entry_signal', label: 'Minervini 진입 신호' },
+                { key: 'stage_2', label: 'Stage 2 진입 조건' },
+                { key: 'rs_ok', label: 'RS Rating >= 80' },
+                { key: 'vcp_detected', label: 'VCP 패턴' },
+                { key: 'pivot_near', label: '피봇 근접/돌파' },
+                { key: 'strength_ok', label: '신호강도 >= 90' },
+                { key: 'above_150_200', label: '1. 현재가 > 150일/200일선' },
+                { key: 'ma150_above_200', label: '2. 150일선 > 200일선' },
+                { key: 'ma200_rising', label: '3. 200일선 상승' },
+                { key: 'ma50_above_150_200', label: '4. 50일선 > 150일/200일선' },
+                { key: 'above_50', label: '5. 현재가 > 50일선' },
+                { key: 'above_52w_low', label: '6. 52주 저점 대비 +30%' },
+                { key: 'near_52w_high', label: '7. 52주 고점 대비 -25% 이내' },
+                { key: 'rs_strong', label: '8. RS Rating >= 70' }
+            ];
+
+            html += `
+                <div class="analysis-section">
+                    <div class="analysis-grid">
+                        <div class="analysis-box">
+                            <div class="analysis-box-title">
+                                David Ryan 완전 전략
+                                <span class="score-badge">${stock.Ryan_신호강도 || 0}점</span>
+                            </div>
+                            ${
+                                ryanItems.map(item => {
+                                    const value = item.key === 'entry_signal' ? !!stock.Ryan_진입신호 : !!ryanChecks[item.key];
+                                    return `
+                                        <div class="check-item ${value ? 'pass' : 'fail'}">
+                                            <div class="check-line">
+                                                <span class="check-icon ${value ? 'pass' : 'fail'}">${value ? 'O' : 'X'}</span>
+                                                <div class="check-label">${item.label}</div>
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('')
+                            }
+                        </div>
+                        <div class="analysis-box">
+                            <div class="analysis-box-title">
+                                Mark Minervini Trend Template
+                                <span class="score-badge">${stock.미너비니_신호강도 || 0}점</span>
+                            </div>
+                            ${
+                                minItems.map(item => {
+                                    const value = item.key === 'entry_signal'
+                                        ? !!stock.미너비니_진입신호
+                                        : (item.key in tt ? !!tt[item.key] : !!minChecks[item.key]);
+                                    return `
+                                        <div class="check-item ${value ? 'pass' : 'fail'}">
+                                            <div class="check-line">
+                                                <span class="check-icon ${value ? 'pass' : 'fail'}">${value ? 'O' : 'X'}</span>
+                                                <div class="check-label">${item.label}</div>
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('')
+                            }
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            html += '</div>';
+            const detail = document.getElementById('detail-content');
+            detail.classList.remove('empty-state');
+            detail.innerHTML = html;
+
+            // 차트 생성
+            if (currentData.chart_data && currentData.chart_data[ticker]) {
+                setTimeout(() => drawChart(ticker), 100);
+            }
+        }
+
+        function updateFilteredTickers() {
+            const stockList = document.getElementById('stockList');
+            if (!stockList) {
+                filteredTickers = [];
+                activeIndex = -1;
+                return;
+            }
+            const items = Array.from(stockList.querySelectorAll('.stock-item'));
+            filteredTickers = items.map(item => item.dataset.ticker);
+            const activeItem = items.find(item => item.classList.contains('active'));
+            activeIndex = activeItem ? filteredTickers.indexOf(activeItem.dataset.ticker) : -1;
+        }
+
+        function updateActiveIndex(ticker) {
+            if (!filteredTickers.length) {
+                activeIndex = -1;
+                return;
+            }
+            const idx = filteredTickers.indexOf(ticker);
+            if (idx !== -1) {
+                activeIndex = idx;
+            }
+        }
+
+        function scrollStockIntoView(ticker) {
+            const stockList = document.getElementById('stockList');
+            if (!stockList) return;
+            const item = stockList.querySelector(`[data-ticker="${ticker}"]`);
+            if (item) {
+                item.scrollIntoView({ block: 'nearest' });
+            }
+        }
+
+        function setupKeyboardNavigation() {
+            document.addEventListener('keydown', (event) => {
+                if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+                const target = event.target;
+                if (target && ['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName)) return;
+                if (!filteredTickers.length) return;
+
+                event.preventDefault();
+                if (activeIndex === -1) {
+                    activeIndex = 0;
+                } else {
+                    activeIndex += event.key === 'ArrowDown' ? 1 : -1;
+                    if (activeIndex < 0) activeIndex = 0;
+                    if (activeIndex >= filteredTickers.length) activeIndex = filteredTickers.length - 1;
+                }
+                const ticker = filteredTickers[activeIndex];
+                if (ticker) {
+                    showStock(ticker);
+                }
+            });
+        }
+
+        function setupStockListScrollbar() {
+            const stockList = document.getElementById('stockList');
+            if (!stockList) return;
+            if (stockList.dataset.scrollSetup === 'true') return;
+            stockList.dataset.scrollSetup = 'true';
+            stockList.addEventListener('scroll', () => {
+                stockList.classList.add('show-scrollbar');
+                if (stockListScrollTimer) {
+                    clearTimeout(stockListScrollTimer);
+                }
+                stockListScrollTimer = setTimeout(() => {
+                    stockList.classList.remove('show-scrollbar');
+                }, 700);
+            });
+        }
+
+        // 차트 그리기
+        function drawChart(ticker) {
+            const chartData = currentData.chart_data[ticker];
+            if (!chartData) return;
+
+            const ctx = document.getElementById('priceChart');
+            if (!ctx) return;
+
+            const existing = Chart.getChart(ctx);
+            if (existing) {
+                existing.destroy();
+            }
+            if (currentChart) {
+                currentChart.destroy();
+                currentChart = null;
+            }
+
+            const stock = currentData.signals.find(s => s.종목코드 === ticker);
+            const entryRyan = stock?.Ryan_진입가 || null;
+            const stopRyan = stock?.Ryan_손절가 || null;
+            const entryMin = stock?.미너비니_진입가 || null;
+            const stopMin = stock?.미너비니_손절가 || null;
+            const signalDate = currentData?.date || null;
+            const signalDateIdx = signalDate ? chartData.dates?.indexOf(signalDate) : -1;
+            const message = document.getElementById('chartMessage');
+            if (message) {
+                message.style.display = 'none';
+            }
+
+            const annotations = {};
+            if (entryRyan) {
+                annotations.entryRyan = {
+                    type: 'line',
+                    yMin: entryRyan,
+                    yMax: entryRyan,
+                    borderColor: '#4caf50',
+                    borderWidth: 1,
+                    label: { display: true, content: 'Ryan 진입가', color: '#4caf50' }
+                };
+            }
+            if (stopRyan) {
+                annotations.stopRyan = {
+                    type: 'line',
+                    yMin: stopRyan,
+                    yMax: stopRyan,
+                    borderColor: '#f44336',
+                    borderWidth: 1,
+                    label: { display: true, content: 'Ryan 손절가', color: '#f44336' }
+                };
+            }
+            if (entryMin) {
+                annotations.entryMin = {
+                    type: 'line',
+                    yMin: entryMin,
+                    yMax: entryMin,
+                    borderColor: '#2196f3',
+                    borderDash: [4, 4],
+                    borderWidth: 1,
+                    label: { display: true, content: 'Minervini 진입가', color: '#2196f3' }
+                };
+            }
+            if (stopMin) {
+                annotations.stopMin = {
+                    type: 'line',
+                    yMin: stopMin,
+                    yMax: stopMin,
+                    borderColor: '#ff9800',
+                    borderDash: [4, 4],
+                    borderWidth: 1,
+                    label: { display: true, content: 'Minervini 손절가', color: '#ff9800' }
+                };
+            }
+            if (signalDateIdx !== -1) {
+                annotations.signalDate = {
+                    type: 'line',
+                    xMin: signalDateIdx,
+                    xMax: signalDateIdx,
+                    borderColor: '#667eea',
+                    borderWidth: 1,
+                    label: { display: true, content: '신호일', color: '#667eea' }
+                };
+            }
+
+            const closes = chartData.close.map(v => Number(v)).map(v => (Number.isFinite(v) ? v : null));
+            const volumes = (chartData.volume || []).map(v => (Number.isFinite(Number(v)) ? Number(v) : 0));
+            const candles = [];
+            for (let i = 0; i < chartData.dates.length; i += 1) {
+                const o = Number(chartData.open[i]);
+                const h = Number(chartData.high[i]);
+                const l = Number(chartData.low[i]);
+                const c = Number(chartData.close[i]);
+                if (![o, h, l, c].every(Number.isFinite)) continue;
+                candles.push({ x: i, o, h, l, c });
+            }
+            const volumeColors = closes.map((value, idx) => {
+                if (!Number.isFinite(value)) return 'rgba(132, 142, 156, 0.25)';
+                const prev = idx > 0 ? closes[idx - 1] : value;
+                if (!Number.isFinite(prev)) return 'rgba(132, 142, 156, 0.25)';
+                return value >= prev ? 'rgba(34, 197, 94, 0.45)' : 'rgba(239, 68, 68, 0.45)';
+            });
+            const ma = (values, window) => {
+                const out = [];
+                for (let i = 0; i < values.length; i += 1) {
+                    if (i + 1 < window) {
+                        out.push(null);
+                        continue;
+                    }
+                    const slice = values.slice(i + 1 - window, i + 1).filter(v => Number.isFinite(v));
+                    if (!slice.length) {
+                        out.push(null);
+                        continue;
+                    }
+                    out.push(slice.reduce((a, b) => a + b, 0) / slice.length);
+                }
+                return out;
+            };
+
+            const ma50 = ma(closes, 50);
+            const ma150 = ma(closes, 150);
+            const ma200 = ma(closes, 200);
+
+            if (!candles.length) {
+                if (message) {
+                    message.style.display = 'flex';
+                }
+                return;
+            }
+
+            try {
+                const hasCandle = ensureFinancialRegistered();
+                ensureZoomRegistered();
+                registerCrosshairPlugin();
+                const formatNumber = (value) => Number.isFinite(value) ? value.toLocaleString() : '-';
+                const candleLows = candles.map(c => c.l);
+                const candleHighs = candles.map(c => c.h);
+                const priceMinRaw = Math.min(...candleLows);
+                const priceMaxRaw = Math.max(...candleHighs);
+                const priceMin = Number.isFinite(priceMinRaw) ? priceMinRaw : Math.min(...closes.filter(v => Number.isFinite(v)));
+                const priceMax = Number.isFinite(priceMaxRaw) ? priceMaxRaw : Math.max(...closes.filter(v => Number.isFinite(v)));
+                const pricePad = Number.isFinite(priceMax - priceMin) ? (priceMax - priceMin) * 0.1 : 0;
+                const indexPoints = closes.map((value, idx) => ({ x: idx, y: value }));
+                const volumePoints = volumes.map((value, idx) => ({ x: idx, y: value }));
+                const maPoints = (values) => values.map((value, idx) => ({ x: idx, y: value }));
+                const baseConfig = {
+                    data: {
+                        datasets: [
+                            {
+                                type: hasCandle ? 'candlestick' : 'line',
+                                label: hasCandle ? '캔들' : '종가',
+                                data: hasCandle ? candles : indexPoints,
+                                parsing: hasCandle ? false : true,
+                                borderColor: '#22c55e',
+                                borderWidth: hasCandle ? 1 : 2,
+                                upColor: '#22c55e',
+                                downColor: '#22c55e',
+                                tension: hasCandle ? 0 : 0.15,
+                                pointRadius: 0,
+                                fill: false,
+                                yAxisID: 'y',
+                                order: 2
+                            },
+                            {
+                                type: 'line',
+                                label: '50일 이평',
+                                data: maPoints(ma50),
+                                borderColor: '#3dd5c4',
+                                borderWidth: 2,
+                                tension: 0.1,
+                                pointRadius: 0,
+                                parsing: false,
+                                fill: false,
+                                yAxisID: 'y',
+                                order: 2
+                            },
+                            {
+                                type: 'line',
+                                label: '150일 이평',
+                                data: maPoints(ma150),
+                                borderColor: '#f59e0b',
+                                borderWidth: 2,
+                                tension: 0.1,
+                                pointRadius: 0,
+                                parsing: false,
+                                fill: false,
+                                yAxisID: 'y',
+                                order: 2
+                            },
+                            {
+                                type: 'line',
+                                label: '200일 이평',
+                                data: maPoints(ma200),
+                                borderColor: '#ef4444',
+                                borderWidth: 2,
+                                tension: 0.1,
+                                pointRadius: 0,
+                                parsing: false,
+                                fill: false,
+                                yAxisID: 'y',
+                                order: 2
+                            },
+                            {
+                                type: 'bar',
+                                label: '거래량',
+                                data: volumePoints,
+                                backgroundColor: volumeColors,
+                                borderColor: 'rgba(132, 142, 156, 0.45)',
+                                barPercentage: 1.0,
+                                categoryPercentage: 0.95,
+                                maxBarThickness: 18,
+                                parsing: false,
+                                yAxisID: 'yVolume',
+                                order: 1
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        layout: {
+                            padding: { top: 12, bottom: 12 }
+                        },
+                        interaction: {
+                            mode: 'index',
+                            intersect: false
+                        },
+                        plugins: {
+                            legend: { display: true, labels: { color: '#cbd5f5' } },
+                            title: { display: true, text: '가격 & 거래량 차트', color: '#e8eaed' },
+                            annotation: { annotations },
+                            tooltip: {
+                                enabled: true,
+                                callbacks: {
+                                    title: (items) => {
+                                        const idx = items?.[0]?.dataIndex ?? 0;
+                                        return chartData.dates?.[idx] || '';
+                                    },
+                                    label: (context) => {
+                                        const label = context.dataset.label || '';
+                                        if (label === '캔들' && context.raw) {
+                                            const raw = context.raw;
+                                            return [
+                                                `시가: ${formatNumber(raw.o)}원`,
+                                                `고가: ${formatNumber(raw.h)}원`,
+                                                `저가: ${formatNumber(raw.l)}원`,
+                                                `종가: ${formatNumber(raw.c)}원`
+                                            ];
+                                        }
+                                        if (label === '거래량') {
+                                            return `거래량: ${formatNumber(context.parsed?.y)}주`;
+                                        }
+                                        return `${label}: ${formatNumber(context.parsed?.y)}원`;
+                                    }
+                                }
+                            },
+                            zoom: {
+                                pan: {
+                                    enabled: true,
+                                    mode: 'x',
+                                    threshold: 2,
+                                    modifierKey: null
+                                },
+                                zoom: {
+                                    wheel: {
+                                        enabled: true
+                                    },
+                                    pinch: {
+                                        enabled: true
+                                    },
+                                    mode: 'x'
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                type: 'linear',
+                                ticks: {
+                                    color: '#848e9c',
+                                    maxRotation: 0,
+                                    minRotation: 0,
+                                    callback: (value) => chartData.dates?.[Math.round(value)] || ''
+                                }
+                            },
+                            y: {
+                                position: 'right',
+                                ticks: { color: '#848e9c' },
+                                grid: { color: 'rgba(255, 255, 255, 0.06)' },
+                                suggestedMin: priceMin - pricePad,
+                                suggestedMax: priceMax + pricePad,
+                                grace: '12%'
+                            },
+                            yVolume: {
+                                position: 'left',
+                                grid: { drawOnChartArea: false },
+                                ticks: { color: '#848e9c', maxTicksLimit: 4 },
+                                min: 0,
+                                suggestedMax: (Math.max(...volumes) || 1) * 4,
+                                grace: '10%'
+                            }
+                        }
+                    }
+                };
+
+                const renderChart = (type) => {
+                    const active = Chart.getChart(ctx);
+                    if (active) {
+                        active.destroy();
+                    }
+                    if (currentChart) {
+                        currentChart.destroy();
+                        currentChart = null;
+                    }
+                    currentChart = new Chart(ctx, {
+                        type,
+                        ...baseConfig
+                    });
+                };
+                try {
+                    renderChart('line');
+                } catch (chartError) {
+                    throw chartError;
+                }
+                if (currentChart) {
+                    enableDragPan(currentChart, chartData.dates.length - 1);
+                }
+            } catch (error) {
+                if (message) {
+                    message.textContent = '차트 렌더링 중 오류가 발생했습니다.';
+                    message.style.display = 'flex';
+                }
+                console.error('차트 렌더링 오류:', error);
+            }
+        }
+    </script>
+</body>
+</html>
