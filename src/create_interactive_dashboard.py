@@ -654,6 +654,10 @@ def generate_interactive_dashboard():
         let filteredTickers = [];
         let activeIndex = -1;
         let stockListScrollTimer = null;
+        const DATA_BASE_PATH = (() => {{
+            const pathname = window.location.pathname || '';
+            return pathname.includes('/web/') ? '../data/weekly_data' : 'data/weekly_data';
+        }})();
 
         // 페이지 로드 시 날짜 목록 및 첫 데이터 로드
         window.addEventListener('DOMContentLoaded', () => {{
@@ -809,7 +813,7 @@ def generate_interactive_dashboard():
             const select = document.getElementById('dateSelect');
             const existing = Array.from(select.options).map(opt => opt.value).filter(Boolean);
             let dates = [];
-            const candidates = ['../data/weekly_data/index.json', '../data/weekly_data/manifest.json'];
+            const candidates = [`${{DATA_BASE_PATH}}/index.json`, `${{DATA_BASE_PATH}}/manifest.json`];
 
             for (const path of candidates) {{
                 try {{
@@ -863,7 +867,7 @@ def generate_interactive_dashboard():
         async function loadLatestPrices() {{
             if (latestLoaded) return;
             try {{
-                const response = await fetch('../data/weekly_data/latest_prices.json');
+                const response = await fetch(`${{DATA_BASE_PATH}}/latest_prices.json`);
                 if (response.ok) {{
                     latestPrices = await response.json();
                 }}
@@ -887,7 +891,7 @@ def generate_interactive_dashboard():
 
             try {{
                 await loadLatestPrices();
-                const response = await fetch(`../data/weekly_data/signals_${{date}}.json`);
+                const response = await fetch(`${{DATA_BASE_PATH}}/signals_${{date}}.json`);
                 if (!response.ok) throw new Error('데이터 로드 실패');
 
                 const text = await response.text();

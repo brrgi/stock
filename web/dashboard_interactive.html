@@ -562,7 +562,8 @@
             <div class="date-selector">
                 <label for="dateSelect">분석 날짜 선택</label>
                 <select id="dateSelect" onchange="loadDateData(this.value)">
-                    <option value="2026-01-04">2026-01-04</option>
+                    <option value="2026-01-05">2026-01-05</option>
+<option value="2026-01-04">2026-01-04</option>
 <option value="2026-01-03">2026-01-03</option>
 <option value="2026-01-01">2026-01-01</option>
 <option value="2025-12-26">2025-12-26</option>
@@ -646,6 +647,10 @@
         let filteredTickers = [];
         let activeIndex = -1;
         let stockListScrollTimer = null;
+        const DATA_BASE_PATH = (() => {
+            const pathname = window.location.pathname || '';
+            return pathname.includes('/web/') ? '../data/weekly_data' : 'data/weekly_data';
+        })();
 
         // 페이지 로드 시 날짜 목록 및 첫 데이터 로드
         window.addEventListener('DOMContentLoaded', () => {
@@ -801,7 +806,7 @@
             const select = document.getElementById('dateSelect');
             const existing = Array.from(select.options).map(opt => opt.value).filter(Boolean);
             let dates = [];
-            const candidates = ['../data/weekly_data/index.json', '../data/weekly_data/manifest.json'];
+            const candidates = [`${DATA_BASE_PATH}/index.json`, `${DATA_BASE_PATH}/manifest.json`];
 
             for (const path of candidates) {
                 try {
@@ -855,7 +860,7 @@
         async function loadLatestPrices() {
             if (latestLoaded) return;
             try {
-                const response = await fetch('../data/weekly_data/latest_prices.json');
+                const response = await fetch(`${DATA_BASE_PATH}/latest_prices.json`);
                 if (response.ok) {
                     latestPrices = await response.json();
                 }
@@ -879,7 +884,7 @@
 
             try {
                 await loadLatestPrices();
-                const response = await fetch(`../data/weekly_data/signals_${date}.json`);
+                const response = await fetch(`${DATA_BASE_PATH}/signals_${date}.json`);
                 if (!response.ok) throw new Error('데이터 로드 실패');
 
                 const text = await response.text();
