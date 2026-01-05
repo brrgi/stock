@@ -654,10 +654,12 @@ def generate_interactive_dashboard():
         let filteredTickers = [];
         let activeIndex = -1;
         let stockListScrollTimer = null;
-        const DATA_BASE_PATH = (() => {{
+        const DATA_ROOT = (() => {{
             const pathname = window.location.pathname || '';
-            return pathname.includes('/web/') ? '../data/weekly_data' : 'data/weekly_data';
+            return pathname.includes('/web/') ? '..' : '.';
         }})();
+        const DATA_WEEKLY_PATH = `${{DATA_ROOT}}/data/weekly_data`;
+        const DATA_INTRADAY_PATH = `${{DATA_ROOT}}/data/intraday`;
 
         // 페이지 로드 시 날짜 목록 및 첫 데이터 로드
         window.addEventListener('DOMContentLoaded', () => {{
@@ -813,7 +815,8 @@ def generate_interactive_dashboard():
             const select = document.getElementById('dateSelect');
             const existing = Array.from(select.options).map(opt => opt.value).filter(Boolean);
             let dates = [];
-            const candidates = [`${{DATA_BASE_PATH}}/index.json`, `${{DATA_BASE_PATH}}/manifest.json`];
+            const candidates = [`${{DATA_WEEKLY_PATH}}/index.json`, `${{DATA_WEEKLY_PATH}}/manifest.json`];
+            let intradayMeta = null;
 
             for (const path of candidates) {{
                 try {{
@@ -851,7 +854,31 @@ def generate_interactive_dashboard():
                 availableDates.push({{ date: todayStr, signals: 0, isToday: true }});
             }}
             availableDates.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+
+            try {{
+                const response = await fetch(`${{DATA_INTRADAY_PATH}}/summary.json`);
+                if (response.ok) {{
+                    intradayMeta = await response.json();
+                }}
+            }} catch (error) {{
+                intradayMeta = null;
+            }}
+
             select.innerHTML = '';
+            if (intradayMeta?.date) {{
+                const labelParts = [
+                    '장중',
+                    intradayMeta.date,
+                    intradayMeta.time || ''
+                ].filter(Boolean);
+                const label = intradayMeta.signals == null
+                    ? labelParts.join(' ')
+                    : `${{labelParts.join(' ')}} (${{intradayMeta.signals}})`;
+                const option = document.createElement('option');
+                option.value = 'intraday';
+                option.textContent = label;
+                select.appendChild(option);
+            }}
             availableDates.forEach(item => {{
                 const date = item.date;
                 const label = item.isToday
@@ -867,7 +894,7 @@ def generate_interactive_dashboard():
         async function loadLatestPrices() {{
             if (latestLoaded) return;
             try {{
-                const response = await fetch(`${{DATA_BASE_PATH}}/latest_prices.json`);
+                const response = await fetch(`${{DATA_WEEKLY_PATH}}/latest_prices.json`);
                 if (response.ok) {{
                     latestPrices = await response.json();
                 }}
@@ -880,6 +907,10 @@ def generate_interactive_dashboard():
 
         function getPreferredDate() {{
             if (!availableDates || availableDates.length === 0) return null;
+            const select = document.getElementById('dateSelect');
+            if (select?.querySelector?.('option[value="intraday"]')) {{
+                return 'intraday';
+            }}
             const withSignals = availableDates.find(item => (item.signals ?? 0) > 0);
             return (withSignals ? withSignals.date : availableDates[0].date);
         }}
@@ -891,7 +922,11 @@ def generate_interactive_dashboard():
 
             try {{
                 await loadLatestPrices();
-                const response = await fetch(`${{DATA_BASE_PATH}}/signals_${{date}}.json`);
+                const isIntraday = date === 'intraday';
+                const dataPath = isIntraday
+                    ? `${{DATA_INTRADAY_PATH}}/latest.json`
+                    : `${{DATA_WEEKLY_PATH}}/signals_${{date}}.json`;
+                const response = await fetch(dataPath);
                 if (!response.ok) throw new Error('데이터 로드 실패');
 
                 const text = await response.text();

@@ -160,6 +160,72 @@ class StockDataCollector:
         print(f"[데이터 수집] 총 {len(stock_list)}개 종목 발견")
         return stock_list
 
+    def get_intraday_price_snapshot(self, market='ALL', pages=25):
+        """
+        장중 가격 스냅샷(무료/비공식) 수집
+        - Naver 시장 요약 페이지 기반 (지연/누락 가능)
+        - 반환 컬럼: Code, Name, Market, Close
+        """
+        def fetch_naver_market_sum(sosok, pages=25):
+            rows = []
+            for page in range(1, pages + 1):
+                url = f"https://finance.naver.com/sise/sise_market_sum.nhn?sosok={sosok}&page={page}"
+                resp = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=15)
+                if resp.status_code != 200 or len(resp.text) < 1000:
+                    break
+
+                dfs = pd.read_html(StringIO(resp.text), header=0)
+                if not dfs:
+                    break
+                df = None
+                for table in dfs:
+                    if '종목명' in table.columns:
+                        df = table
+                        break
+                if df is None:
+                    break
+                df = df.dropna(how='all')
+
+                soup = BeautifulSoup(resp.text, 'html.parser')
+                links = soup.select('table.type_2 a')
+                codes = []
+                for a in links:
+                    href = a.get('href', '')
+                    if 'code=' in href:
+                        code = href.split('code=')[-1]
+                        if code.isdigit():
+                            codes.append(code.zfill(6))
+
+                df = df[df['종목명'].notna()].reset_index(drop=True)
+                if len(codes) < len(df):
+                    codes = codes + [None] * (len(df) - len(codes))
+
+                df = df.rename(columns={'종목명': 'Name', '현재가': 'Close'})
+                df['Code'] = codes[:len(df)]
+                df['Market'] = 'KOSPI' if sosok == 0 else 'KOSDAQ'
+                df['Close'] = pd.to_numeric(df['Close'].astype(str).str.replace(',', ''), errors='coerce')
+                rows.append(df[['Code', 'Name', 'Market', 'Close']])
+
+            if not rows:
+                return pd.DataFrame(columns=['Code', 'Name', 'Market', 'Close'])
+            combined = pd.concat(rows, ignore_index=True)
+            combined = combined.dropna(subset=['Code'])
+            combined = combined.drop_duplicates(subset=['Code']).reset_index(drop=True)
+            return combined
+
+        if market == 'ALL':
+            kospi = fetch_naver_market_sum(0, pages=pages)
+            kosdaq = fetch_naver_market_sum(1, pages=pages)
+            snapshot = pd.concat([kospi, kosdaq], ignore_index=True)
+        elif market == 'KOSPI':
+            snapshot = fetch_naver_market_sum(0, pages=pages)
+        elif market == 'KOSDAQ':
+            snapshot = fetch_naver_market_sum(1, pages=pages)
+        else:
+            raise ValueError("market은 'KOSPI', 'KOSDAQ', 또는 'ALL'이어야 합니다.")
+
+        return snapshot.reset_index(drop=True)
+
     def get_stock_price_data(self, ticker, start_date, end_date=None):
         """
         특정 종목의 가격 데이터 가져오기
